@@ -8,7 +8,6 @@ import '../services/card_data_service.dart';
 final cardDataProvider = FutureProvider<CardDataResult>((ref) async {
   return await CardDataService.loadCards();
 });
-
 // ── Filter state provider ─────────────────────────────────────────────────────
 
 final filterStateProvider =

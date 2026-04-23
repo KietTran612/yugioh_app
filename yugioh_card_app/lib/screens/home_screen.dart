@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/card_provider.dart';
+import '../services/card_data_service.dart';
 import '../widgets/card_item.dart';
 import '../widgets/filter_panel.dart';
 import 'card_detail_screen.dart';
@@ -62,6 +63,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('Yu-Gi-Oh! Cards'),
         actions: [
+          // Refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () => _confirmRefresh(context),
+            tooltip: 'Refresh card data',
+          ),
           // Active filter indicator
           if (filter.hasActiveFilters)
             Padding(
@@ -192,6 +199,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmRefresh(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Refresh Card Data'),
+        content: const Text(
+          'This will re-fetch all cards from the YGOPRODeck API.\n\nIt may take a moment. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Clear cache first so loadCards() goes to API
+              await CardDataService.clearCache();
+              ref.invalidate(cardDataProvider);
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
           ),
         ],
       ),

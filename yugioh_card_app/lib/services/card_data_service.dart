@@ -8,12 +8,8 @@ import '../models/card_model.dart';
 const _apiBase = 'https://db.ygoprodeck.com/api/v7';
 const _imageBase = 'https://images.ygoprodeck.com/images/cards';
 const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
-const _cacheKey = 'yugioh_cards_cache';
+const _cacheKey = 'yugioh_cards_cache_v2';
 
-/// Loads card data:
-/// 1. Bundled assets (cards.json) — if present
-/// 2. SharedPreferences cache — saved from previous API fetch
-/// 3. Fetch from YGOPRODeck API → save to cache for next time
 class CardDataService {
   static final _dio = Dio(
     BaseOptions(
@@ -22,44 +18,54 @@ class CardDataService {
     ),
   );
 
+  /// Load cards:
+  /// 1. Bundled assets (if present and non-empty)
+  /// 2. SharedPreferences cache (saved from previous fetch)
+  /// 3. Fetch from API → save full data to cache
   static Future<CardDataResult> loadCards({
     void Function(String message)? onStatus,
   }) async {
-    // 1. Try bundled assets
+    // 1. Bundled assets
     try {
       onStatus?.call('Loading local data...');
       final result = await _loadFromAssets();
       if (result != null) {
         debugPrint(
-          '[CardDataService] Loaded ${result.cards.length} cards from assets.',
+          '[CardData] Loaded ${result.cards.length} cards from assets.',
         );
         return result;
       }
     } catch (e) {
-      debugPrint('[CardDataService] Assets not available: $e');
+      debugPrint('[CardData] Assets not available: $e');
     }
 
-    // 2. Try SharedPreferences cache
+    // 2. Cache
     try {
       onStatus?.call('Loading cached data...');
       final result = await _loadFromCache();
       if (result != null) {
         debugPrint(
-          '[CardDataService] Loaded ${result.cards.length} cards from cache.',
+          '[CardData] Loaded ${result.cards.length} cards from cache.',
         );
         return result;
       }
     } catch (e) {
-      debugPrint('[CardDataService] Cache not available: $e');
+      debugPrint('[CardData] Cache not available: $e');
     }
 
-    // 3. Fetch from API then save to cache
-    final result = await _fetchFromApi(onStatus: onStatus);
-    unawaited(_saveToCache(result));
-    return result;
+    // 3. Fetch from API
+    return await _fetchAndCache(onStatus: onStatus);
   }
 
-  // ── 1. Bundled assets ──────────────────────────────────────────────────────
+  /// Force re-fetch from API and overwrite cache
+  static Future<CardDataResult> refreshFromApi({
+    void Function(String message)? onStatus,
+  }) async {
+    await clearCache();
+    return await _fetchAndCache(onStatus: onStatus);
+  }
+
+  // ── Internal ───────────────────────────────────────────────────────────────
 
   static Future<CardDataResult?> _loadFromAssets() async {
     try {
@@ -68,7 +74,6 @@ class CardDataService {
         cache: false,
       );
       if (jsonStr.isEmpty) return null;
-      // compute() not supported on web — parse directly
       final result = kIsWeb
           ? _parseCardDataJson(jsonStr)
           : await compute(_parseCardDataJson, jsonStr);
@@ -83,16 +88,45 @@ class CardDataService {
     final prefs = await SharedPreferences.getInstance();
     final jsonStr = prefs.getString(_cacheKey);
     if (jsonStr == null || jsonStr.isEmpty) return null;
+    debugPrint(
+      '[CardData] Cache size: ${(jsonStr.length / 1024 / 1024).toStringAsFixed(1)} MB',
+    );
     return kIsWeb
         ? _parseCardDataJson(jsonStr)
         : await compute(_parseCardDataJson, jsonStr);
   }
 
+  static Future<CardDataResult> _fetchAndCache({
+    void Function(String message)? onStatus,
+  }) async {
+    onStatus?.call('Connecting to YGOPRODeck API...');
+
+    final response = await _dio.get(
+      '$_apiBase/cardinfo.php',
+      queryParameters: {'misc': 'yes'},
+      options: Options(responseType: ResponseType.json),
+    );
+
+    final rawCards = response.data['data'] as List<dynamic>;
+    onStatus?.call('Processing ${rawCards.length} cards...');
+    debugPrint('[CardData] Fetched ${rawCards.length} cards from API.');
+
+    final result = kIsWeb
+        ? _parseApiCards(rawCards)
+        : await compute(_parseApiCards, rawCards);
+
+    // Save full data to cache in background
+    onStatus?.call('Saving to cache...');
+    await _saveToCache(result);
+
+    onStatus?.call('Done!');
+    return result;
+  }
+
   static Future<void> _saveToCache(CardDataResult result) async {
     try {
-      // Use lightweight version to fit localStorage ~5MB limit on web
       final json = {
-        'cards': result.cards.map(_cardToJsonLight).toList(),
+        'cards': result.cards.map(_cardToJson).toList(),
         'filter_index': {
           'types': result.filterIndex.types,
           'frame_types': result.filterIndex.frameTypes,
@@ -106,73 +140,69 @@ class CardDataService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_cacheKey, jsonStr);
       debugPrint(
-        '[CardDataService] Cache saved (${(jsonStr.length / 1024 / 1024).toStringAsFixed(1)} MB).',
+        '[CardData] Cache saved: ${(jsonStr.length / 1024 / 1024).toStringAsFixed(1)} MB',
       );
     } catch (e) {
-      debugPrint('[CardDataService] Failed to save cache: $e');
-      // Non-fatal — app still works, just re-fetches next time
+      // QuotaExceededError on web localStorage — non-fatal, app still works
+      debugPrint('[CardData] Cache save failed (quota?): $e');
     }
   }
 
-  // ── 3. Fetch from API ──────────────────────────────────────────────────────
-
-  static Future<CardDataResult> _fetchFromApi({
-    void Function(String message)? onStatus,
-  }) async {
-    onStatus?.call('Connecting to YGOPRODeck API...');
-
-    final response = await _dio.get(
-      '$_apiBase/cardinfo.php',
-      queryParameters: {'misc': 'yes'},
-      options: Options(responseType: ResponseType.json),
-    );
-
-    final rawCards = response.data['data'] as List<dynamic>;
-    onStatus?.call('Processing ${rawCards.length} cards...');
-    debugPrint('[CardDataService] Fetched ${rawCards.length} cards from API.');
-
-    final result = kIsWeb
-        ? _parseApiCards(rawCards)
-        : await compute(_parseApiCards, rawCards);
-    onStatus?.call('Done!');
-    return result;
-  }
-
-  /// Force clear cache — next load will re-fetch from API
   static Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheKey);
-    debugPrint('[CardDataService] Cache cleared.');
+    debugPrint('[CardData] Cache cleared.');
   }
-}
-
-// ignore: library_prefixes
-void unawaited(Future<void> future) {
-  future.catchError(
-    (e) => debugPrint('[CardDataService] Background error: $e'),
-  );
 }
 
 // ── Serialization ──────────────────────────────────────────────────────────────
 
-/// Lightweight serialization — omits desc/sets/prices to fit web localStorage (~5MB)
-Map<String, dynamic> _cardToJsonLight(YugiohCard c) {
+Map<String, dynamic> _cardToJson(YugiohCard c) {
   final map = <String, dynamic>{
     'id': c.id,
     'name': c.name,
     'type': c.type,
     'frame_type': c.frameType,
-    'desc': '', // omitted in cache, re-fetched from API if needed
+    'desc': c.desc,
     'race': c.race,
     'archetype': c.archetype,
     'image_url': c.imageUrl,
     'image_url_small': c.imageUrlSmall,
-    'card_images': [
-      {'id': c.id, 'image_url': c.imageUrl, 'image_url_small': c.imageUrlSmall},
-    ],
-    'prices': null,
-    'sets': const [],
-    'misc': null,
+    'card_images': c.cardImages
+        .map(
+          (img) => {
+            'id': img.id,
+            'image_url': img.imageUrl,
+            'image_url_small': img.imageUrlSmall,
+          },
+        )
+        .toList(),
+    'prices': c.prices != null
+        ? {
+            'tcgplayer': c.prices!.tcgplayer,
+            'cardmarket': c.prices!.cardmarket,
+            'ebay': c.prices!.ebay,
+            'amazon': c.prices!.amazon,
+          }
+        : null,
+    'sets': c.sets
+        .map(
+          (s) => {
+            'set_name': s.setName,
+            'set_code': s.setCode,
+            'set_rarity': s.setRarity,
+            'set_rarity_code': s.setRarityCode,
+          },
+        )
+        .toList(),
+    'misc': c.misc != null
+        ? {
+            'formats': c.misc!.formats,
+            'tcg_date': c.misc!.tcgDate,
+            'ocg_date': c.misc!.ocgDate,
+            'views': c.misc!.views,
+          }
+        : null,
   };
   if (c.atk != null) map['atk'] = c.atk;
   if (c.def != null) map['def'] = c.def;
@@ -300,7 +330,7 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
   );
 }
 
-// ── Result model ───────────────────────────────────────────────────────────────
+// ── Result model ───────────────────────────────────────────────name────────────
 
 class CardDataResult {
   final List<YugiohCard> cards;
