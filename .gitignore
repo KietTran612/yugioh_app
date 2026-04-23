@@ -1,6 +1,7 @@
-# Data files (too large, fetched at runtime)
-yugioh_card_app/assets/data/cards.json
-yugioh_card_app/assets/data/archetypes.json
+# Data files — placeholder committed, real data fetched at runtime
+# Uncomment below if you want to bundle real data (will increase app size ~20MB)
+# yugioh_card_app/assets/data/cards.json
+# yugioh_card_app/assets/data/archetypes.json
 
 # Flutter/Dart
 **/android/.gradle

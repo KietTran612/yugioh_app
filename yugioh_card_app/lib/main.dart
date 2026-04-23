@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/home_screen.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: YugiohApp(),
-    ),
-  );
+  FlutterError.onError = (details) {
+    debugPrint('Flutter error: ${details.exceptionAsString()}');
+    debugPrint(details.stack.toString());
+  };
+  runApp(const ProviderScope(child: YugiohApp()));
 }
 
 class YugiohApp extends StatelessWidget {
@@ -24,10 +24,7 @@ class YugiohApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-        ),
+        appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
       ),
       darkTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

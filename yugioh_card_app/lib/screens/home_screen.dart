@@ -68,7 +68,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // Card grid
           Expanded(
             child: cardsAsync.when(
-              loading: () => _LoadingView(),
+              loading: () => const _LoadingView(),
               error: (e, _) => _ErrorView(
                 error: e,
                 onRetry: () => ref.invalidate(cardDataProvider),
@@ -145,26 +145,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
 // ── Loading widget ─────────────────────────────────────────────────────────────
 
-class _LoadingView extends ConsumerWidget {
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(loadingStatusProvider);
-    return Center(
+  Widget build(BuildContext context) {
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 24),
+          CircularProgressIndicator(),
+          SizedBox(height: 24),
+          Text('Loading cards...'),
+          SizedBox(height: 8),
           Text(
-            status ?? 'Loading cards...',
-            style: Theme.of(context).textTheme.bodyLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'This may take a moment on first launch',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+            'Fetching from API on first launch',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
         ],
       ),

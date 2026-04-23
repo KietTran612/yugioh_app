@@ -1,24 +1,19 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/card_model.dart';
 
 const _apiBase = 'https://db.ygoprodeck.com/api/v7';
 const _imageBase = 'https://images.ygoprodeck.com/images/cards';
 const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
-
-// Key dùng cho SharedPreferences (web) và tên file (mobile/desktop)
 const _cacheKey = 'yugioh_cards_cache';
-const _cacheFileName = 'cards_cache.json';
 
 /// Loads card data:
-/// 1. Bundled assets (cards.json)
-/// 2. Local cache (SharedPreferences on web, file on mobile/desktop)
-/// 3. Fetch from YGOPRODeck API → save to cache
+/// 1. Bundled assets (cards.json) — if present
+/// 2. SharedPreferences cache — saved from previous API fetch
+/// 3. Fetch from YGOPRODeck API → save to cache for next time
 class CardDataService {
   static final _dio = Dio(
     BaseOptions(
@@ -44,7 +39,7 @@ class CardDataService {
       debugPrint('[CardDataService] Assets not available: $e');
     }
 
-    // 2. Try local cache
+    // 2. Try SharedPreferences cache
     try {
       onStatus?.call('Loading cached data...');
       final result = await _loadFromCache();
@@ -58,15 +53,9 @@ class CardDataService {
       debugPrint('[CardDataService] Cache not available: $e');
     }
 
-    // 3. Fetch from API and save to cache
-    debugPrint('[CardDataService] Fetching from API...');
+    // 3. Fetch from API then save to cache
     final result = await _fetchFromApi(onStatus: onStatus);
-
-    // Save to cache in background
-    _saveToCache(result).catchError((e) {
-      debugPrint('[CardDataService] Failed to save cache: $e');
-    });
-
+    unawaited(_saveToCache(result));
     return result;
   }
 
@@ -79,34 +68,47 @@ class CardDataService {
         cache: false,
       );
       if (jsonStr.isEmpty) return null;
-      return await compute(_parseCardDataJson, jsonStr);
+      // compute() not supported on web — parse directly
+      final result = kIsWeb
+          ? _parseCardDataJson(jsonStr)
+          : await compute(_parseCardDataJson, jsonStr);
+      if (result.cards.isEmpty) return null;
+      return result;
     } on FlutterError {
       return null;
     }
   }
 
-  // ── 2. Local cache ─────────────────────────────────────────────────────────
-
   static Future<CardDataResult?> _loadFromCache() async {
-    final jsonStr = kIsWeb ? await _readFromPrefs() : await _readFromFile();
-
-    if (jsonStr == null || jsonStr.isEmpty) return null;
-    return await compute(_parseCardDataJson, jsonStr);
-  }
-
-  static Future<String?> _readFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_cacheKey);
+    final jsonStr = prefs.getString(_cacheKey);
+    if (jsonStr == null || jsonStr.isEmpty) return null;
+    return kIsWeb
+        ? _parseCardDataJson(jsonStr)
+        : await compute(_parseCardDataJson, jsonStr);
   }
 
-  static Future<String?> _readFromFile() async {
+  static Future<void> _saveToCache(CardDataResult result) async {
     try {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$_cacheFileName');
-      if (!await file.exists()) return null;
-      return await file.readAsString();
+      final json = {
+        'cards': result.cards.map(_cardToJson).toList(),
+        'filter_index': {
+          'types': result.filterIndex.types,
+          'frame_types': result.filterIndex.frameTypes,
+          'races': result.filterIndex.races,
+          'attributes': result.filterIndex.attributes,
+          'archetypes': result.filterIndex.archetypes,
+          'levels': result.filterIndex.levels,
+        },
+      };
+      final jsonStr = jsonEncode(json);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonStr);
+      debugPrint(
+        '[CardDataService] Cache saved (${(jsonStr.length / 1024 / 1024).toStringAsFixed(1)} MB).',
+      );
     } catch (e) {
-      return null;
+      debugPrint('[CardDataService] Failed to save cache: $e');
     }
   }
 
@@ -123,65 +125,33 @@ class CardDataService {
       options: Options(responseType: ResponseType.json),
     );
 
-    onStatus?.call(
-      'Processing ${(response.data['data'] as List).length} cards...',
-    );
-
     final rawCards = response.data['data'] as List<dynamic>;
+    onStatus?.call('Processing ${rawCards.length} cards...');
     debugPrint('[CardDataService] Fetched ${rawCards.length} cards from API.');
 
-    final result = await compute(_parseApiCards, rawCards);
+    final result = kIsWeb
+        ? _parseApiCards(rawCards)
+        : await compute(_parseApiCards, rawCards);
     onStatus?.call('Done!');
     return result;
   }
 
-  // ── Save to cache ──────────────────────────────────────────────────────────
-
-  static Future<void> _saveToCache(CardDataResult result) async {
-    // Serialize back to the same JSON format _parseCardDataJson expects
-    final json = {
-      'cards': result.cards.map(_cardToJson).toList(),
-      'filter_index': {
-        'types': result.filterIndex.types,
-        'frame_types': result.filterIndex.frameTypes,
-        'races': result.filterIndex.races,
-        'attributes': result.filterIndex.attributes,
-        'archetypes': result.filterIndex.archetypes,
-        'levels': result.filterIndex.levels,
-      },
-    };
-
-    final jsonStr = jsonEncode(json);
-
-    if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cacheKey, jsonStr);
-      debugPrint('[CardDataService] Saved cache to SharedPreferences.');
-    } else {
-      final dir = await getApplicationDocumentsDirectory();
-      final file = File('${dir.path}/$_cacheFileName');
-      await file.writeAsString(jsonStr);
-      debugPrint('[CardDataService] Saved cache to ${file.path}');
-    }
-  }
-
-  /// Clear cached data (useful for force-refresh)
+  /// Force clear cache — next load will re-fetch from API
   static Future<void> clearCache() async {
-    if (kIsWeb) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
-    } else {
-      try {
-        final dir = await getApplicationDocumentsDirectory();
-        final file = File('${dir.path}/$_cacheFileName');
-        if (await file.exists()) await file.delete();
-      } catch (_) {}
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_cacheKey);
     debugPrint('[CardDataService] Cache cleared.');
   }
 }
 
-// ── Serialization helpers ──────────────────────────────────────────────────────
+// ignore: library_prefixes
+void unawaited(Future<void> future) {
+  future.catchError(
+    (e) => debugPrint('[CardDataService] Background error: $e'),
+  );
+}
+
+// ── Serialization ──────────────────────────────────────────────────────────────
 
 Map<String, dynamic> _cardToJson(YugiohCard c) {
   final map = <String, dynamic>{
@@ -230,7 +200,6 @@ Map<String, dynamic> _cardToJson(YugiohCard c) {
           }
         : null,
   };
-
   if (c.atk != null) map['atk'] = c.atk;
   if (c.def != null) map['def'] = c.def;
   if (c.level != null) map['level'] = c.level;
@@ -238,11 +207,10 @@ Map<String, dynamic> _cardToJson(YugiohCard c) {
   if (c.scale != null) map['scale'] = c.scale;
   if (c.linkVal != null) map['link_val'] = c.linkVal;
   if (c.linkMarkers.isNotEmpty) map['link_markers'] = c.linkMarkers;
-
   return map;
 }
 
-// ── Isolate-safe parse functions ───────────────────────────────────────────────
+// ── Isolate-safe parsers ───────────────────────────────────────────────────────
 
 CardDataResult _parseCardDataJson(String jsonStr) {
   final json = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -329,7 +297,6 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
     return YugiohCard.fromJson(normalized);
   }).toList();
 
-  // Build filter index
   final types = <String>{};
   final frameTypes = <String>{};
   final races = <String>{};
@@ -346,16 +313,17 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
     if (c.level != null) levels.add(c.level!);
   }
 
-  final filterIndex = FilterIndex(
-    types: types.toList()..sort(),
-    frameTypes: frameTypes.toList()..sort(),
-    races: races.toList()..sort(),
-    attributes: attributes.toList()..sort(),
-    archetypes: archetypes.toList()..sort(),
-    levels: levels.toList()..sort(),
+  return CardDataResult(
+    cards: cards,
+    filterIndex: FilterIndex(
+      types: types.toList()..sort(),
+      frameTypes: frameTypes.toList()..sort(),
+      races: races.toList()..sort(),
+      attributes: attributes.toList()..sort(),
+      archetypes: archetypes.toList()..sort(),
+      levels: levels.toList()..sort(),
+    ),
   );
-
-  return CardDataResult(cards: cards, filterIndex: filterIndex);
 }
 
 // ── Result model ───────────────────────────────────────────────────────────────
