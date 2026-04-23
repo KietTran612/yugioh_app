@@ -1,0 +1,209 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
+import '../models/card_model.dart';
+
+const _apiBase = 'https://db.ygoprodeck.com/api/v7';
+const _imageBase = 'https://images.ygoprodeck.com/images/cards';
+const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
+
+/// Loads card data either from bundled assets or fetches from API as fallback.
+class CardDataService {
+  static final _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+    ),
+  );
+
+  /// Main entry point — tries assets first, falls back to API fetch.
+  static Future<CardDataResult> loadCards({
+    void Function(String message)? onStatus,
+  }) async {
+    // 1. Try loading from bundled assets
+    try {
+      onStatus?.call('Loading local data...');
+      final result = await _loadFromAssets();
+      if (result != null) {
+        debugPrint(
+          '[CardDataService] Loaded ${result.cards.length} cards from assets.',
+        );
+        return result;
+      }
+    } catch (e) {
+      debugPrint('[CardDataService] Assets not available: $e');
+    }
+
+    // 2. Fallback: fetch from YGOPRODeck API
+    debugPrint('[CardDataService] Fetching from API...');
+    return await _fetchFromApi(onStatus: onStatus);
+  }
+
+  // ── Load from bundled assets ───────────────────────────────────────────────
+
+  static Future<CardDataResult?> _loadFromAssets() async {
+    try {
+      final jsonStr = await rootBundle.loadString(
+        'assets/data/cards.json',
+        cache: false,
+      );
+      if (jsonStr.isEmpty) return null;
+
+      return await compute(_parseCardDataJson, jsonStr);
+    } on FlutterError {
+      // Asset not found
+      return null;
+    }
+  }
+
+  // ── Fetch from API ─────────────────────────────────────────────────────────
+
+  static Future<CardDataResult> _fetchFromApi({
+    void Function(String message)? onStatus,
+  }) async {
+    onStatus?.call('Connecting to YGOPRODeck API...');
+
+    final response = await _dio.get(
+      '$_apiBase/cardinfo.php',
+      queryParameters: {'misc': 'yes'},
+      options: Options(responseType: ResponseType.json),
+    );
+
+    onStatus?.call('Processing card data...');
+
+    final rawCards = (response.data['data'] as List<dynamic>);
+    debugPrint('[CardDataService] Fetched ${rawCards.length} cards from API.');
+
+    // Parse on isolate to avoid blocking UI
+    final result = await compute(_parseApiCards, rawCards);
+
+    onStatus?.call('Done!');
+    return result;
+  }
+}
+
+// ── Isolate-safe parse functions ───────────────────────────────────────────────
+
+CardDataResult _parseCardDataJson(String jsonStr) {
+  final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+  final cards = (json['cards'] as List<dynamic>)
+      .map((e) => YugiohCard.fromJson(e as Map<String, dynamic>))
+      .toList();
+  final filterIndex = FilterIndex.fromJson(
+    json['filter_index'] as Map<String, dynamic>,
+  );
+  return CardDataResult(cards: cards, filterIndex: filterIndex);
+}
+
+CardDataResult _parseApiCards(List<dynamic> rawCards) {
+  final cards = rawCards.map((raw) {
+    final card = raw as Map<String, dynamic>;
+    final images = card['card_images'] as List<dynamic>? ?? [];
+    final cardId = images.isNotEmpty ? images[0]['id'] : card['id'];
+
+    final prices = <String, String>{};
+    final cardPrices = card['card_prices'] as List<dynamic>? ?? [];
+    if (cardPrices.isNotEmpty) {
+      final p = cardPrices[0] as Map<String, dynamic>;
+      prices['tcgplayer'] = p['tcgplayer_price'] as String? ?? '0.00';
+      prices['cardmarket'] = p['cardmarket_price'] as String? ?? '0.00';
+      prices['ebay'] = p['ebay_price'] as String? ?? '0.00';
+      prices['amazon'] = p['amazon_price'] as String? ?? '0.00';
+    }
+
+    final sets = (card['card_sets'] as List<dynamic>? ?? []).map((s) {
+      final set = s as Map<String, dynamic>;
+      return {
+        'set_name': set['set_name'] ?? '',
+        'set_code': set['set_code'] ?? '',
+        'set_rarity': set['set_rarity'] ?? '',
+        'set_rarity_code': set['set_rarity_code'] ?? '',
+      };
+    }).toList();
+
+    final miscList = card['misc_info'] as List<dynamic>? ?? [];
+    final misc = miscList.isNotEmpty
+        ? {
+            'formats': (miscList[0] as Map<String, dynamic>)['formats'] ?? [],
+            'tcg_date': (miscList[0] as Map<String, dynamic>)['tcg_date'] ?? '',
+            'ocg_date': (miscList[0] as Map<String, dynamic>)['ocg_date'] ?? '',
+            'views': (miscList[0] as Map<String, dynamic>)['views'] ?? 0,
+          }
+        : <String, dynamic>{};
+
+    final normalized = <String, dynamic>{
+      'id': card['id'],
+      'name': card['name'] ?? '',
+      'type': card['type'] ?? '',
+      'frame_type': card['frameType'] ?? '',
+      'desc': card['desc'] ?? '',
+      'race': card['race'] ?? '',
+      'archetype': card['archetype'] ?? '',
+      'image_url': '$_imageBase/$cardId.jpg',
+      'image_url_small': '$_imageSmallBase/$cardId.jpg',
+      'card_images': images
+          .map(
+            (img) => {
+              'id': img['id'],
+              'image_url': '$_imageBase/${img['id']}.jpg',
+              'image_url_small': '$_imageSmallBase/${img['id']}.jpg',
+            },
+          )
+          .toList(),
+      'prices': prices,
+      'sets': sets,
+      'misc': misc,
+    };
+
+    // Monster-specific fields
+    final frameType = card['frameType'] as String? ?? '';
+    if (frameType != 'spell' && frameType != 'trap') {
+      normalized['atk'] = card['atk'];
+      normalized['def'] = card['def'];
+      normalized['level'] = card['level'];
+      normalized['attribute'] = card['attribute'] ?? '';
+      normalized['scale'] = card['scale'];
+      normalized['link_val'] = card['linkval'];
+      normalized['link_markers'] = card['linkmarkers'] ?? [];
+    }
+
+    return YugiohCard.fromJson(normalized);
+  }).toList();
+
+  // Build filter index
+  final types = <String>{};
+  final frameTypes = <String>{};
+  final races = <String>{};
+  final attributes = <String>{};
+  final archetypes = <String>{};
+  final levels = <int>{};
+
+  for (final c in cards) {
+    if (c.type.isNotEmpty) types.add(c.type);
+    if (c.frameType.isNotEmpty) frameTypes.add(c.frameType);
+    if (c.race.isNotEmpty) races.add(c.race);
+    if (c.attribute?.isNotEmpty == true) attributes.add(c.attribute!);
+    if (c.archetype.isNotEmpty) archetypes.add(c.archetype);
+    if (c.level != null) levels.add(c.level!);
+  }
+
+  final filterIndex = FilterIndex(
+    types: types.toList()..sort(),
+    frameTypes: frameTypes.toList()..sort(),
+    races: races.toList()..sort(),
+    attributes: attributes.toList()..sort(),
+    archetypes: archetypes.toList()..sort(),
+    levels: levels.toList()..sort(),
+  );
+
+  return CardDataResult(cards: cards, filterIndex: filterIndex);
+}
+
+// ── Result model ───────────────────────────────────────────────────────────────
+
+class CardDataResult {
+  final List<YugiohCard> cards;
+  final FilterIndex filterIndex;
+  const CardDataResult({required this.cards, required this.filterIndex});
+}
