@@ -5,6 +5,8 @@ import '../widgets/card_item.dart';
 import '../widgets/filter_panel.dart';
 import 'card_detail_screen.dart';
 
+const _pageSize = 50;
+
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -14,34 +16,75 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  int _displayCount = _pageSize;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    // Load more when near bottom
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 400) {
+      final cardsAsync = ref.read(filteredCardsProvider);
+      cardsAsync.whenData((cards) {
+        if (_displayCount < cards.length) {
+          setState(() => _displayCount += _pageSize);
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cardsAsync = ref.watch(filteredCardsProvider);
     final filterNotifier = ref.read(filterStateProvider.notifier);
+    final filter = ref.watch(filterStateProvider);
+
+    // Reset display count when filter changes
+    ref.listen(filterStateProvider, (prev, next) {
+      if (prev != next) {
+        setState(() => _displayCount = _pageSize);
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Yu-Gi-Oh! Cards'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () => _showFilterSheet(context),
-            tooltip: 'Filters',
-          ),
+          // Active filter indicator
+          if (filter.hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                icon: Badge(child: const Icon(Icons.filter_list)),
+                onPressed: () => _showFilterSheet(context),
+                tooltip: 'Filters (active)',
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.filter_list),
+              onPressed: () => _showFilterSheet(context),
+              tooltip: 'Filters',
+            ),
         ],
       ),
       body: Column(
         children: [
           // Search bar
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -64,6 +107,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onChanged: filterNotifier.setSearch,
             ),
           ),
+
+          // Card count
+          cardsAsync
+                  .whenData(
+                    (cards) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${cards.length} cards',
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  )
+                  .valueOrNull ??
+              const SizedBox(height: 6),
 
           // Card grid
           Expanded(
@@ -90,17 +155,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   );
                 }
 
+                final displayCards = cards.take(_displayCount).toList();
+                final hasMore = _displayCount < cards.length;
+
                 return GridView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.all(12),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: _getCrossAxisCount(context),
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
                     childAspectRatio: 0.6,
                   ),
-                  itemCount: cards.length,
+                  // +1 for loading indicator at bottom
+                  itemCount: displayCards.length + (hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
-                    final card = cards[index];
+                    if (index == displayCards.length) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                    }
+                    final card = displayCards[index];
                     return CardItem(
                       card: card,
                       onTap: () => Navigator.push(
@@ -124,12 +202,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      // useSafeArea prevents sheet from going under system UI
+      useSafeArea: true,
       builder: (_) => DraggableScrollableSheet(
         initialChildSize: 0.7,
-        minChildSize: 0.5,
+        minChildSize: 0.4,
         maxChildSize: 0.95,
         expand: false,
-        builder: (_, controller) => const FilterPanel(),
+        builder: (_, controller) => FilterPanel(scrollController: controller),
       ),
     );
   }

@@ -90,8 +90,9 @@ class CardDataService {
 
   static Future<void> _saveToCache(CardDataResult result) async {
     try {
+      // Use lightweight version to fit localStorage ~5MB limit on web
       final json = {
-        'cards': result.cards.map(_cardToJson).toList(),
+        'cards': result.cards.map(_cardToJsonLight).toList(),
         'filter_index': {
           'types': result.filterIndex.types,
           'frame_types': result.filterIndex.frameTypes,
@@ -109,6 +110,7 @@ class CardDataService {
       );
     } catch (e) {
       debugPrint('[CardDataService] Failed to save cache: $e');
+      // Non-fatal — app still works, just re-fetches next time
     }
   }
 
@@ -153,52 +155,24 @@ void unawaited(Future<void> future) {
 
 // ── Serialization ──────────────────────────────────────────────────────────────
 
-Map<String, dynamic> _cardToJson(YugiohCard c) {
+/// Lightweight serialization — omits desc/sets/prices to fit web localStorage (~5MB)
+Map<String, dynamic> _cardToJsonLight(YugiohCard c) {
   final map = <String, dynamic>{
     'id': c.id,
     'name': c.name,
     'type': c.type,
     'frame_type': c.frameType,
-    'desc': c.desc,
+    'desc': '', // omitted in cache, re-fetched from API if needed
     'race': c.race,
     'archetype': c.archetype,
     'image_url': c.imageUrl,
     'image_url_small': c.imageUrlSmall,
-    'card_images': c.cardImages
-        .map(
-          (img) => {
-            'id': img.id,
-            'image_url': img.imageUrl,
-            'image_url_small': img.imageUrlSmall,
-          },
-        )
-        .toList(),
-    'prices': c.prices != null
-        ? {
-            'tcgplayer': c.prices!.tcgplayer,
-            'cardmarket': c.prices!.cardmarket,
-            'ebay': c.prices!.ebay,
-            'amazon': c.prices!.amazon,
-          }
-        : null,
-    'sets': c.sets
-        .map(
-          (s) => {
-            'set_name': s.setName,
-            'set_code': s.setCode,
-            'set_rarity': s.setRarity,
-            'set_rarity_code': s.setRarityCode,
-          },
-        )
-        .toList(),
-    'misc': c.misc != null
-        ? {
-            'formats': c.misc!.formats,
-            'tcg_date': c.misc!.tcgDate,
-            'ocg_date': c.misc!.ocgDate,
-            'views': c.misc!.views,
-          }
-        : null,
+    'card_images': [
+      {'id': c.id, 'image_url': c.imageUrl, 'image_url_small': c.imageUrlSmall},
+    ],
+    'prices': null,
+    'sets': const [],
+    'misc': null,
   };
   if (c.atk != null) map['atk'] = c.atk;
   if (c.def != null) map['def'] = c.def;
