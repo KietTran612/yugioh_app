@@ -1,27 +1,36 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/card_model.dart';
 
 const _apiBase = 'https://db.ygoprodeck.com/api/v7';
 const _imageBase = 'https://images.ygoprodeck.com/images/cards';
 const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
 
-/// Loads card data either from bundled assets or fetches from API as fallback.
+// Key dùng cho SharedPreferences (web) và tên file (mobile/desktop)
+const _cacheKey = 'yugioh_cards_cache';
+const _cacheFileName = 'cards_cache.json';
+
+/// Loads card data:
+/// 1. Bundled assets (cards.json)
+/// 2. Local cache (SharedPreferences on web, file on mobile/desktop)
+/// 3. Fetch from YGOPRODeck API → save to cache
 class CardDataService {
   static final _dio = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 120),
     ),
   );
 
-  /// Main entry point — tries assets first, falls back to API fetch.
   static Future<CardDataResult> loadCards({
     void Function(String message)? onStatus,
   }) async {
-    // 1. Try loading from bundled assets
+    // 1. Try bundled assets
     try {
       onStatus?.call('Loading local data...');
       final result = await _loadFromAssets();
@@ -35,12 +44,33 @@ class CardDataService {
       debugPrint('[CardDataService] Assets not available: $e');
     }
 
-    // 2. Fallback: fetch from YGOPRODeck API
+    // 2. Try local cache
+    try {
+      onStatus?.call('Loading cached data...');
+      final result = await _loadFromCache();
+      if (result != null) {
+        debugPrint(
+          '[CardDataService] Loaded ${result.cards.length} cards from cache.',
+        );
+        return result;
+      }
+    } catch (e) {
+      debugPrint('[CardDataService] Cache not available: $e');
+    }
+
+    // 3. Fetch from API and save to cache
     debugPrint('[CardDataService] Fetching from API...');
-    return await _fetchFromApi(onStatus: onStatus);
+    final result = await _fetchFromApi(onStatus: onStatus);
+
+    // Save to cache in background
+    _saveToCache(result).catchError((e) {
+      debugPrint('[CardDataService] Failed to save cache: $e');
+    });
+
+    return result;
   }
 
-  // ── Load from bundled assets ───────────────────────────────────────────────
+  // ── 1. Bundled assets ──────────────────────────────────────────────────────
 
   static Future<CardDataResult?> _loadFromAssets() async {
     try {
@@ -49,15 +79,38 @@ class CardDataService {
         cache: false,
       );
       if (jsonStr.isEmpty) return null;
-
       return await compute(_parseCardDataJson, jsonStr);
     } on FlutterError {
-      // Asset not found
       return null;
     }
   }
 
-  // ── Fetch from API ─────────────────────────────────────────────────────────
+  // ── 2. Local cache ─────────────────────────────────────────────────────────
+
+  static Future<CardDataResult?> _loadFromCache() async {
+    final jsonStr = kIsWeb ? await _readFromPrefs() : await _readFromFile();
+
+    if (jsonStr == null || jsonStr.isEmpty) return null;
+    return await compute(_parseCardDataJson, jsonStr);
+  }
+
+  static Future<String?> _readFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_cacheKey);
+  }
+
+  static Future<String?> _readFromFile() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$_cacheFileName');
+      if (!await file.exists()) return null;
+      return await file.readAsString();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ── 3. Fetch from API ──────────────────────────────────────────────────────
 
   static Future<CardDataResult> _fetchFromApi({
     void Function(String message)? onStatus,
@@ -70,17 +123,123 @@ class CardDataService {
       options: Options(responseType: ResponseType.json),
     );
 
-    onStatus?.call('Processing card data...');
+    onStatus?.call(
+      'Processing ${(response.data['data'] as List).length} cards...',
+    );
 
-    final rawCards = (response.data['data'] as List<dynamic>);
+    final rawCards = response.data['data'] as List<dynamic>;
     debugPrint('[CardDataService] Fetched ${rawCards.length} cards from API.');
 
-    // Parse on isolate to avoid blocking UI
     final result = await compute(_parseApiCards, rawCards);
-
     onStatus?.call('Done!');
     return result;
   }
+
+  // ── Save to cache ──────────────────────────────────────────────────────────
+
+  static Future<void> _saveToCache(CardDataResult result) async {
+    // Serialize back to the same JSON format _parseCardDataJson expects
+    final json = {
+      'cards': result.cards.map(_cardToJson).toList(),
+      'filter_index': {
+        'types': result.filterIndex.types,
+        'frame_types': result.filterIndex.frameTypes,
+        'races': result.filterIndex.races,
+        'attributes': result.filterIndex.attributes,
+        'archetypes': result.filterIndex.archetypes,
+        'levels': result.filterIndex.levels,
+      },
+    };
+
+    final jsonStr = jsonEncode(json);
+
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cacheKey, jsonStr);
+      debugPrint('[CardDataService] Saved cache to SharedPreferences.');
+    } else {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$_cacheFileName');
+      await file.writeAsString(jsonStr);
+      debugPrint('[CardDataService] Saved cache to ${file.path}');
+    }
+  }
+
+  /// Clear cached data (useful for force-refresh)
+  static Future<void> clearCache() async {
+    if (kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cacheKey);
+    } else {
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        final file = File('${dir.path}/$_cacheFileName');
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
+    debugPrint('[CardDataService] Cache cleared.');
+  }
+}
+
+// ── Serialization helpers ──────────────────────────────────────────────────────
+
+Map<String, dynamic> _cardToJson(YugiohCard c) {
+  final map = <String, dynamic>{
+    'id': c.id,
+    'name': c.name,
+    'type': c.type,
+    'frame_type': c.frameType,
+    'desc': c.desc,
+    'race': c.race,
+    'archetype': c.archetype,
+    'image_url': c.imageUrl,
+    'image_url_small': c.imageUrlSmall,
+    'card_images': c.cardImages
+        .map(
+          (img) => {
+            'id': img.id,
+            'image_url': img.imageUrl,
+            'image_url_small': img.imageUrlSmall,
+          },
+        )
+        .toList(),
+    'prices': c.prices != null
+        ? {
+            'tcgplayer': c.prices!.tcgplayer,
+            'cardmarket': c.prices!.cardmarket,
+            'ebay': c.prices!.ebay,
+            'amazon': c.prices!.amazon,
+          }
+        : null,
+    'sets': c.sets
+        .map(
+          (s) => {
+            'set_name': s.setName,
+            'set_code': s.setCode,
+            'set_rarity': s.setRarity,
+            'set_rarity_code': s.setRarityCode,
+          },
+        )
+        .toList(),
+    'misc': c.misc != null
+        ? {
+            'formats': c.misc!.formats,
+            'tcg_date': c.misc!.tcgDate,
+            'ocg_date': c.misc!.ocgDate,
+            'views': c.misc!.views,
+          }
+        : null,
+  };
+
+  if (c.atk != null) map['atk'] = c.atk;
+  if (c.def != null) map['def'] = c.def;
+  if (c.level != null) map['level'] = c.level;
+  if (c.attribute != null) map['attribute'] = c.attribute;
+  if (c.scale != null) map['scale'] = c.scale;
+  if (c.linkVal != null) map['link_val'] = c.linkVal;
+  if (c.linkMarkers.isNotEmpty) map['link_markers'] = c.linkMarkers;
+
+  return map;
 }
 
 // ── Isolate-safe parse functions ───────────────────────────────────────────────
@@ -156,7 +315,6 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
       'misc': misc,
     };
 
-    // Monster-specific fields
     final frameType = card['frameType'] as String? ?? '';
     if (frameType != 'spell' && frameType != 'trap') {
       normalized['atk'] = card['atk'];
