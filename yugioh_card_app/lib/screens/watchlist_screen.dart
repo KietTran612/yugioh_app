@@ -6,6 +6,7 @@ import '../utils/app_theme.dart';
 import '../widgets/card_item.dart';
 import '../widgets/quick_filter_bar.dart';
 import 'card_detail_screen.dart';
+import 'main_shell.dart' show tabPush;
 
 class WatchlistScreen extends ConsumerStatefulWidget {
   const WatchlistScreen({super.key});
@@ -191,7 +192,7 @@ class _WatchlistScreenState extends ConsumerState<WatchlistScreen> {
                           final card = cards[index];
                           return CardItem(
                             card: card,
-                            onTap: () => Navigator.push(
+                            onTap: () => tabPush(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => CardDetailScreen(card: card),

@@ -4,6 +4,7 @@ import '../providers/card_sets_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/card_image.dart';
 import 'set_detail_screen.dart';
+import 'main_shell.dart' show tabPush;
 
 class SetsScreen extends ConsumerStatefulWidget {
   const SetsScreen({super.key});
@@ -266,7 +267,7 @@ class _SetsScreenState extends ConsumerState<SetsScreen> {
                         itemBuilder: (context, index) {
                           return _SetCard(
                             setInfo: sets[index],
-                            onTap: () => Navigator.push(
+                            onTap: () => tabPush(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>

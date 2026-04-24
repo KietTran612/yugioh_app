@@ -4,6 +4,7 @@ import '../providers/card_sets_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/card_item.dart';
 import 'card_detail_screen.dart';
+import 'main_shell.dart' show tabPush;
 
 class SetDetailScreen extends StatefulWidget {
   final CardSetInfo setInfo;
@@ -288,7 +289,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                       final card = filtered[index];
                       return CardItem(
                         card: card,
-                        onTap: () => Navigator.push(
+                        onTap: () => tabPush(
                           context,
                           MaterialPageRoute(
                             builder: (_) => CardDetailScreen(card: card),

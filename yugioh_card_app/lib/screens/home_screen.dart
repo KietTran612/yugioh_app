@@ -7,6 +7,7 @@ import '../widgets/card_item.dart';
 import '../widgets/filter_panel.dart';
 import '../widgets/quick_filter_bar.dart';
 import 'card_detail_screen.dart';
+import 'main_shell.dart' show tabPush;
 
 const _pageSize = 50;
 
@@ -192,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     final card = displayCards[index];
                     return CardItem(
                       card: card,
-                      onTap: () => Navigator.push(
+                      onTap: () => tabPush(
                         context,
                         MaterialPageRoute(
                           builder: (_) => CardDetailScreen(card: card),

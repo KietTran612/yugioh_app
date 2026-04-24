@@ -2,7 +2,7 @@
 
 ## Tổng quan
 
-Flutter app hiển thị thông tin toàn bộ card game Yu-Gi-Oh! (~14,000+ cards), hỗ trợ Android, iOS và Web. Data được lấy từ [YGOPRODeck API](https://ygoprodeck.com/api-guide/) miễn phí.
+Flutter app hiển thị thông tin toàn bộ card game Yu-Gi-Oh! (~14,000+ cards), hỗ trợ Android, iOS và Web. Data lấy từ [YGOPRODeck API](https://ygoprodeck.com/api-guide/) miễn phí, cache local bằng SharedPreferences.
 
 ---
 
@@ -10,49 +10,41 @@ Flutter app hiển thị thông tin toàn bộ card game Yu-Gi-Oh! (~14,000+ car
 
 ```
 yugioh-card-app/
-├── HANDOVER.md                      # Tài liệu này
-├── run_web.bat                      # Script chạy app trên Chrome (double-click)
-├── data-collector/                  # Python script thu thập data
-│   ├── fetch_cards.py               # Fetch từ API, lưu ra cards.json
-│   └── requirements.txt             # requests, tqdm
-│
-└── yugioh_card_app/                 # Flutter app
-    ├── assets/
-    │   └── data/
-    │       ├── cards.json           # Placeholder (rỗng) — data fetch lúc runtime
-    │       └── archetypes.json      # Placeholder
+├── HANDOVER.md
+├── run_web.bat                      # Double-click để chạy trên Chrome
+├── data-collector/
+│   ├── fetch_cards.py               # Fetch API → cards.json
+│   └── requirements.txt
+└── yugioh_card_app/
+    ├── assets/data/
+    │   └── cards.json               # Placeholder rỗng — data fetch lúc runtime
     ├── lib/
-    │   ├── main.dart                # Entry point, MaterialApp + ProviderScope
+    │   ├── main.dart
     │   ├── models/
-    │   │   ├── card_model.dart      # YugiohCard, CardImage, CardPrices, CardSet, CardMisc, FilterIndex
-    │   │   └── filter_state.dart    # FilterState (multi-select), FilterStateNotifier, SortOption
+    │   │   ├── card_model.dart      # YugiohCard, CardSet, CardMisc, FilterIndex, BanlistInfo
+    │   │   └── filter_state.dart    # FilterState, FilterStateNotifier, SortOption
     │   ├── providers/
-    │   │   ├── card_provider.dart   # cardDataProvider, filterStateProvider, filteredCardsProvider, filterIndexProvider
+    │   │   ├── card_provider.dart   # cardDataProvider, filterStateProvider, filteredCardsProvider
     │   │   ├── card_sets_provider.dart  # cardSetsProvider, setsFilterProvider, filteredSetsProvider
     │   │   ├── favorites_provider.dart  # favoritesProvider, favoriteCardsProvider
-    │   │   └── translation_provider.dart # translationProvider (per-card state)
+    │   │   └── translation_provider.dart
     │   ├── screens/
-    │   │   ├── main_shell.dart      # Bottom navigation shell (5 tabs)
-    │   │   ├── home_screen.dart     # Card grid, search bar, quick filter, pagination
-    │   │   ├── card_detail_screen.dart  # Chi tiết card: ảnh, stats, sets, prices
-    │   │   ├── sets_screen.dart     # Card Sets list với search + sort
-    │   │   ├── set_detail_screen.dart   # Card grid trong 1 set với filter type/rarity
-    │   │   ├── collection_screen.dart   # My Collection (placeholder)
-    │   │   ├── watchlist_screen.dart    # Favorites grid với search/filter
-    │   │   └── more_screen.dart     # Settings, Refresh, About
+    │   │   ├── main_shell.dart      # Shell: IndexedStack + nested Navigator per tab
+    │   │   ├── home_screen.dart     # Card grid, search, quick filter, pagination
+    │   │   ├── card_detail_screen.dart
+    │   │   ├── sets_screen.dart
+    │   │   ├── set_detail_screen.dart
+    │   │   ├── collection_screen.dart   # Placeholder
+    │   │   ├── watchlist_screen.dart
+    │   │   └── more_screen.dart
     │   ├── services/
-    │   │   ├── card_data_service.dart   # Load/cache/fetch logic
-    │   │   └── translation_service.dart # Google Translate API wrapper + cache
-    │   ├── utils/
-    │   │   └── card_colors.dart     # Màu theo frame type và attribute
+    │   │   ├── card_data_service.dart   # Load/cache/fetch
+    │   │   └── translation_service.dart # Google Translate wrapper + cache
     │   └── widgets/
-    │       ├── card_image.dart      # Cross-platform image widget (CORS-safe)
-    │       ├── card_item.dart       # Card thumbnail trong grid (ảnh thuần)
-    │       ├── filter_panel.dart    # Bottom sheet filter popup (multi-select)
-    │       └── quick_filter_bar.dart # Inline expandable filter bar (multi-select, auto-collapse)
-    ├── android/
-    ├── ios/
-    ├── web/
+    │       ├── card_image.dart      # Cross-platform image (CORS-safe)
+    │       ├── card_item.dart       # Card thumbnail
+    │       ├── filter_panel.dart    # Bottom sheet filter
+    │       └── quick_filter_bar.dart
     └── pubspec.yaml
 ```
 
@@ -60,303 +52,133 @@ yugioh-card-app/
 
 ## Tech Stack
 
-| Thành phần | Package | Mục đích |
-|---|---|---|
-| State management | `flutter_riverpod 2.6.1` | Provider, StateNotifier |
-| HTTP client | `dio 5.9.2` | Fetch từ YGOPRODeck API |
-| Translation | `translator 1.0.0` | Google Translate (unofficial API) |
-| Image cache | `cached_network_image 3.4.1` | Load ảnh card từ CDN (mobile/desktop) |
-| Local cache | `shared_preferences 2.5.5` | Cache JSON data |
-| Navigation | `go_router 14.8.1` | (setup sẵn, chưa dùng) |
-| Loading skeleton | `shimmer 3.0.0` | Placeholder khi load ảnh |
+| Package | Mục đích |
+|---|---|
+| `flutter_riverpod 2.6.1` | State management |
+| `dio 5.9.2` | HTTP — fetch YGOPRODeck API |
+| `translator 1.0.0` | Google Translate (unofficial) |
+| `cached_network_image 3.4.1` | Cache ảnh card (mobile/desktop) |
+| `shared_preferences 2.5.5` | Cache JSON data local |
 
 ---
 
 ## Data Flow
 
-```
-App khởi động
-    │
-    ▼
-1. Load assets/data/cards.json
-   (placeholder rỗng → skip)
-    │
-    ▼
-2. Load SharedPreferences cache
-   (lần đầu chưa có → skip)
-   (lần 2+ → load ngay, nhanh)
-    │
-    ▼
-3. Fetch từ YGOPRODeck API
-   GET https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes
-   (~14,000+ cards, ~3-5s)
-    │
-    ▼
-4. Parse & normalize data (full data: desc, sets, prices, misc)
-    │
-    ▼
-5. Lưu vào SharedPreferences cache
-   (web: có thể fail do localStorage 5MB limit — non-fatal)
-    │
-    ▼
-6. Hiển thị card grid
-```
+App khởi động → load SharedPreferences cache (nếu có) → fetch API nếu chưa có cache → parse → lưu cache → hiển thị.
+
+- Lần đầu: fetch API ~3–5s (~14,000 cards)
+- Lần sau: load cache ngay lập tức
+- Web: cache có thể fail (localStorage ~5MB < data ~20MB) → non-fatal, fetch lại mỗi lần mở
 
 ---
 
 ## Tính năng hiện tại
 
-### Navigation (Bottom Bar)
-- **Home** — card grid chính
-- **Sets** — danh sách card sets, search + sort, tap vào xem card trong set
-- **Collection** — placeholder (coming soon)
-- **Watchlist** — favorites grid với search/filter
-- **More** — Refresh Data, About
-- Dùng `IndexedStack` — giữ state từng tab khi switch
+### Navigation
+- 5 tabs: **Home, Sets, Collection, Watchlist, More**
+- `IndexedStack` — giữ state từng tab khi switch
+- **Nested Navigator per tab** — bottom bar luôn hiển thị kể cả khi navigate sâu
+- **Tab active state** — chỉ sáng khi ở root screen; dim khi đang ở màn hình con
+- **Tap tab đang active** → về root tab ngay (`popUntil`)
+- **`tabPush()`** — helper thay `Navigator.push`, dùng trong tất cả screens để shell track depth
 
-### Card Grid (Home Screen)
-- Grid responsive (2-6 cột tùy màn hình)
-- Card hiển thị ảnh thuần, không text bên dưới
-- **Pagination**: load 50 cards đầu, scroll xuống load thêm 50
-- Hiển thị số lượng card đang filter
+### Home — Card Grid
+- Grid responsive 2–6 cột
+- Pagination 50 cards/lần, scroll để load thêm
+- Search theo tên + card text (real-time)
+- **Quick Filter Bar** — inline, 8 sections đóng/mở riêng: Type, Attribute, Race, Level, Archetype, ATK/DEF Range, Sort, Banlist, Format
+  - Auto-collapse khi vượt device height
+  - Badge số khi có filter active
+- **Filter Panel** — bottom sheet popup, đồng bộ với Quick Filter Bar
+- Filter multi-select: Type/Attribute/Race/Level (OR), Banlist (OR), Format (AND), Archetype (single)
 
-### Search
-- Tìm kiếm theo tên card hoặc card text
-- Real-time filter khi gõ
+### Card Detail
+- Ảnh → tap full screen, pinch-to-zoom, Hero animation
+- Badges: frame type, attribute, ATK/DEF, banlist status (đỏ/vàng/xanh)
+- Card text — `SelectableText` (bôi đen copy được)
+- **Dịch** — 11 ngôn ngữ qua Google Translate, cache local, lock chống dịch chồng
+- Formats, Card Sets (tap → Set Detail), Prices
 
-### Quick Filter Bar (inline, dưới search)
-- Đóng/mở bằng tap vào header bar
-- **8 sections** đều có thể đóng/mở riêng: Type, Attribute, Race, Level/Rank, Archetype, ATK Range, DEF Range, Sort By
-- **Auto-collapse**: khi mở section mới vượt quá available height của device → tự đóng section đầu tiên từ trên xuống
-- Height threshold đo bằng `GlobalKey + RenderBox` — không hardcode
-- Badge số trên mỗi section khi có filter active
-- Summary bar hiển thị tất cả filter đang chọn
+### Sets
+- ~700+ sets, derive từ card data (không cần API riêng)
+- Search + sort (Name A→Z/Z→A, Most/Fewest Cards)
+- Tap set → Set Detail: grid card, filter type/rarity, search trong set
 
-### Filter — Multi-select
-- **Type, Attribute, Race, Level** → chọn nhiều giá trị (OR logic)
-- **Archetype** → single-select
-- Chip 2 hàng scroll ngang cho danh sách dài (Race 80+, Archetype 640+)
-- Đồng bộ giữa Quick Filter Bar và Filter Panel popup
+### Watchlist
+- Favorites lưu local (SharedPreferences)
+- Search + filter riêng (độc lập với Home)
 
-### Filter Panel (Bottom Sheet popup)
-- Tương tự Quick Filter Bar nhưng dạng popup
-- Mỗi filter là ConsumerWidget riêng — chỉ rebuild khi giá trị đó thay đổi
-
-### Card Detail Screen
-- Ảnh card — **tap để xem full screen** với pinch-to-zoom, Hero animation
-- Frame type badge màu sắc theo loại card
-- Attribute badge (DARK/LIGHT/FIRE...)
-- ATK / DEF stats badge
-- Race, Level/Rank/Link, Archetype, Pendulum Scale, Link Markers
-- Card text — **có thể bôi đen và copy** (`SelectableText`)
-- **Translation** — tap icon 🌐 để dịch card text sang 11 ngôn ngữ (Vietnamese, Japanese, Korean, Chinese, Spanish, French, German, Italian, Portuguese, Russian, Thai)
-  - Dùng Google Translate API (unofficial, miễn phí)
-  - Cache local (SharedPreferences) — dịch 1 lần, lưu vĩnh viễn
-  - Lock mechanism — không cho dịch chồng chéo (global + per-card)
-  - Loading indicator + error handling
-  - Bản dịch hiển thị phía trên text gốc với style italic + note "Translated by Google"
-  - Tap X để đóng bản dịch
-- Formats (TCG/OCG/Master Duel)
-- Card Sets (tên set, mã set, rarity) — **tap vào row để xem set detail**
-- Giá (TCGPlayer, Cardmarket, eBay, Amazon)
-
-### Card Sets Screen
-- Derive data từ `YugiohCard.sets` — không cần API riêng
-- Danh sách tất cả sets (~700+), mỗi item hiển thị: cover image, tên set, set code, card count, top rarity badge
-- **Search** theo tên set hoặc set code
-- **Sort** (bottom sheet): Name A→Z, Name Z→A, Most Cards, Fewest Cards
-- Active sort label hiển thị inline dưới count badge
-- Tap vào set → `SetDetailScreen`
-
-### Set Detail Screen
-- Grid card trong set, sort theo set code (số thứ tự card trong set)
-- **Type filter chips**: All / Monster / Spell / Trap
-- **Rarity filter chips**: All + tất cả rarity có trong set
-- **Search** trong set theo tên, race, type
-- Stats pills: tổng card, số rarity, số card đang hiển thị sau filter
-- `CardSetInfo` được pre-compute (coverImageUrl, topRarity) — không tính lại mỗi build
-- `_buildSets()` chạy qua `compute()` trên isolate (mobile/desktop), main thread trên web
-
-### Refresh Data
-- Nút Refresh (🔄) trên AppBar Home + tab More
-- Confirm dialog → clear cache → re-fetch từ API
+### More
+- Refresh Data (clear cache + re-fetch), About
 
 ---
 
 ## Cách chạy
 
-### Cách nhanh nhất — double-click `run_web.bat`
-File `run_web.bat` ở root folder, tự động:
-1. Chạy `flutter pub get`
-2. Mở Chrome tại `http://localhost:8080` với `--disable-web-security` (bypass CORS cho ảnh)
-
-### Chạy thủ công trên Web
 ```bash
-cd yugioh-card-app/yugioh_card_app
+# Web — double-click run_web.bat, hoặc:
 flutter run -d chrome --web-port 8080 --web-browser-flag "--disable-web-security"
-```
 
-### Chạy trên Android
-```bash
+# Android
 flutter run -d <device-id>
-# Xem danh sách device: flutter devices
-```
 
-### Build APK
-```bash
+# Build APK
 flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### Thu thập data thủ công (optional)
-```bash
-cd yugioh-card-app/data-collector
-pip install -r requirements.txt
-python fetch_cards.py
-# Output: yugioh_card_app/assets/data/cards.json (~19MB)
-```
-> Nếu bundle `cards.json` vào app, app sẽ load từ assets thay vì fetch API.
-
----
-
-## Flutter Path (Windows)
-
-Flutter SDK: `D:\Download\flutter\bin\flutter.bat`
-
-Thêm vào PATH để dùng lệnh `flutter` trực tiếp:
-```
-D:\Download\flutter\bin
-```
-
-Android Studio: `D:\soflware\Android\Android Studio`
-```bash
-flutter config --android-studio-dir "D:\soflware\Android\Android Studio"
-```
+**Flutter SDK**: `D:\Download\flutter\bin` (thêm vào PATH)
 
 ---
 
 ## Vấn đề đã biết
 
-| Vấn đề | Nguyên nhân | Trạng thái |
-|---|---|---|
-| Cache fail trên Web | localStorage giới hạn ~5MB, data ~20MB | Non-fatal — app vẫn chạy, fetch lại mỗi lần mở |
-| `compute()` không dùng trên Web | Web không hỗ trợ Dart isolates | Đã fix — parse trực tiếp trên web |
-| CORS block ảnh trên Web | Browser chặn cross-origin image request | Đã fix — `--disable-web-security` cho dev |
-| Visual Studio warning | Thiếu C++ workload | Chỉ ảnh hưởng Windows desktop build |
-| Quick Filter auto-collapse | Height estimate dựa trên giá trị xấp xỉ | Hoạt động tốt, có thể fine-tune `_sectionHeights` |
+| Vấn đề | Trạng thái |
+|---|---|
+| Web cache fail (localStorage < data size) | Non-fatal — fetch lại mỗi lần mở |
+| CORS block ảnh trên Web | Fix bằng `--disable-web-security` khi dev |
+| Visual Studio C++ warning | Chỉ ảnh hưởng Windows desktop build, bỏ qua |
 
 ---
 
 ## Changelog
 
+### v0.7 (April 2026)
+- **Persistent bottom nav** — nested Navigator per tab, bottom bar không bị che
+- **Tab active state** — 3 trạng thái: active / dim (đang sâu) / muted (tab khác)
+- **Depth tracking** — `_DepthScope` (InheritedWidget) + `tabPush()` thay `Navigator.push`
+  - Không dùng `NavigatorObserver` (gây assertion crash trên web)
+
 ### v0.6 (April 2026)
-- **Card Sets tab** — hoàn thiện từ placeholder thành tính năng đầy đủ
-  - `CardSetInfo` model — derive từ `YugiohCard.sets`, pre-compute `coverImageUrl` + `topRarity`
-  - `cardSetsProvider` — `FutureProvider`, chạy `_buildSets()` qua `compute()` isolate (non-web)
-  - `SetsFilterState` + `SetsFilterNotifier` — quản lý search + sort độc lập
-  - `filteredSetsProvider` — apply search + sort, cached bởi Riverpod
-  - **Sets Screen**: search bar, sort bottom sheet (4 options), active sort label, cover image + rarity badge
-  - **Set Detail Screen**: type filter chips (Monster/Spell/Trap), rarity filter chips, search trong set, stats pills
-- **Performance fix** — `_SetAccumulator` dùng `Set<int>` thay `List.any()` → O(1) duplicate check
-- **Translation feature** — dịch card text sang 11 ngôn ngữ
-  - `TranslationService` — wrapper Google Translate API (unofficial), cache local, global lock
-  - `TranslationProvider` — per-card state management (loading, error, translated text)
-  - `_CardTextSection` — UI với translate button, draggable language picker, loading/error states
-  - Hybrid approach: cache first → API call → cache result
-  - Lock mechanism: global `_isTranslating` + per-card `isLoading` → không cho dịch chồng chéo
-- **Navigation** — tap Card Sets row trong Card Detail → `SetDetailScreen`
+- **Sets tab** — hoàn thiện: `CardSetInfo`, `cardSetsProvider`, search/sort, Set Detail Screen
+- **Translation** — `TranslationService`, cache + lock, 11 ngôn ngữ
+- **Navigation** — tap set row trong Card Detail → Set Detail Screen
 
 ### v0.5 (April 2026)
-- **Dark "Duel Terminal" UI overhaul** — toàn bộ app chuyển sang dark theme cố định
-  - `AppTheme` class tập trung: màu sắc, ThemeData, helper methods
-  - Background: deep navy `#0A0E1A`, surface: `#111827`, elevated: `#1A2235`
-  - Accent: teal-green `#00C896`, gold `#FFB800`
-- **Card grid** — border + glow shadow màu theo attribute (DARK=tím, LIGHT=vàng, FIRE=đỏ...)
-  - Dùng `imageUrl` (full resolution) thay vì `imageUrlSmall`
-- **AppBar** — logo icon, filter button với dot indicator khi active
-- **Bottom nav** — pill highlight animation, custom `_DuelBottomNav`
-- **Card Detail Screen** — SliverAppBar, ATK/DEF badge riêng màu đỏ/xanh, rarity badge màu theo độ hiếm, "show more sets" expandable
-- **More Screen** — menu group style iOS-like, app info card
-- **Placeholder screens** (Sets, Collection, Watchlist) — dark theme consistent
-- **Favorites (Watchlist)** — local favorites với SharedPreferences
-  - `FavoritesService` — lưu/load Set<int> card IDs
-  - `favoritesProvider` + `favoriteCardsProvider` — StateNotifier
-  - `FavoriteButton` (compact, trên grid) + `FavoriteIconButton` (AppBar detail)
-  - Watchlist screen — grid card yêu thích, clear all, empty state
-- **Watchlist search/filter** — search bar + QuickFilterBar riêng cho Watchlist tab
-  - `watchlistFilterProvider` — FilterState độc lập với Home
-  - `filteredFavoriteCardsProvider` — filter chỉ trong danh sách yêu thích
-  - Result count badge, reset filter button
-- **Banlist status** — parse `banlist_info` từ API (card level, không trong `misc_info`)
-  - `BanlistStatus` enum: Forbidden / Limited / Semi-Limited
-  - `BanlistInfo` model trong `CardMisc`
-  - Hiển thị badge màu trên Card Detail (đỏ=Forbidden, vàng=Limited, xanh=Semi-Limited)
-  - Serialize/deserialize qua cache
-- **Filter: Banlist + Format** — 2 filter mới trong QuickFilterBar
-  - **Banlist filter** — multi-select: Forbidden / Limited / Semi-Limited (OR logic)
-  - **Format filter** — multi-select: TCG / OCG / Master Duel / GOAT (AND logic)
-  - Badge màu cho banlist chips, summary bar hiển thị cả 2 filter
-- **Bug fixes:**
-  - Fix `frameType` parse — API dùng `frame_type` (snake_case), không phải `frameType` (camelCase)
-  - Fix `banlist_info` parse — nằm ở card level, không trong `misc_info[0]`
-  - Fix price display — `'\$price'` → `'\$$price'` trong `_PricesPanel`
-  - Bump cache key `v2` → `v3` để force re-fetch với banlist data
-  - Fix if-without-braces warnings trong `FilterStateNotifier`
+- **Dark "Duel Terminal" UI** — `AppTheme` tập trung, navy/teal/gold palette
+- **Favorites/Watchlist** — lưu local, search/filter riêng
+- **Banlist** — parse + badge + filter (Forbidden/Limited/Semi-Limited)
+- **Format filter** — TCG/OCG/Master Duel/GOAT
 
-### v0.4 (April 2026)
-- **Bottom Navigation Bar** — 5 tabs: Home, Sets, Collection, Watchlist, More
-- **Multi-select filter** — Type, Attribute, Race, Level có thể chọn nhiều giá trị
-- **Quick Filter Bar** — inline expandable filter dưới search box
-  - 8 sections đóng/mở riêng
-  - Auto-collapse khi vượt device height (đo bằng RenderBox, không hardcode)
-  - Chip 2 hàng scroll ngang
-- Card grid: bỏ tên và badge dưới ảnh, chỉ hiển thị ảnh thuần
-- Filter panel popup đồng bộ multi-select
-
-### v0.3 (April 2026)
-- Fix CORS block ảnh trên web
-- Tạo `CardNetworkImage` widget cross-platform
-- Fix Card Detail Screen: bỏ tinted overlay, fix giá, tap ảnh full screen, SelectableText
-
-### v0.2 (April 2026)
-- Performance: pagination, filter ConsumerWidget riêng
-- Fetch đầy đủ data, cache SharedPreferences
-- Nút Refresh, `run_web.bat`
-
-### v0.1 (April 2026)
-- Initial Flutter project (Android + iOS + Web)
-- Card grid, filter/search/sort, card detail
-- Python data collector, auto-fetch từ API
+### v0.1–v0.4 (April 2026)
+- Initial project, card grid, filter/search/sort, card detail, pagination, dark theme, bottom nav, multi-select filter, Quick Filter Bar
 
 ---
 
 ## Hướng phát triển tiếp theo
 
-- [x] **Sets** — danh sách card sets, filter theo set ✅ v0.6
 - [ ] **Collection** — quản lý bộ sưu tập cá nhân
-- [ ] **Web cache** — dùng IndexedDB thay localStorage
-- [ ] **Dark/Light theme toggle**
-- [ ] **Deck Builder** — tạo và lưu deck
-- [ ] **Multiple artworks** — swipe qua các artwork khác nhau
-- [ ] **Offline mode** — bundle data vào app khi release
+- [ ] **Web cache** — IndexedDB thay localStorage
+- [ ] **Deck Builder**
+- [ ] **Multiple artworks** — swipe qua các artwork
+- [ ] **Offline mode** — bundle data vào app
 
 ---
 
-## API Reference
+## API
 
-Base URL: `https://db.ygoprodeck.com/api/v7`
-
-| Endpoint | Mô tả |
-|---|---|
-| `GET /cardinfo.php?misc=yes` | Toàn bộ card data |
-| `GET /cardinfo.php?name=Dark+Magician` | Card theo tên |
-| `GET /archetypes.php` | Danh sách archetypes |
-| `GET /cardsets.php` | Danh sách card sets |
-
-Image CDN:
-- Full: `https://images.ygoprodeck.com/images/cards/{id}.jpg`
-- Small: `https://images.ygoprodeck.com/images/cards_small/{id}.jpg`
+Base: `https://db.ygoprodeck.com/api/v7/cardinfo.php?misc=yes`
+Images: `https://images.ygoprodeck.com/images/cards/{id}.jpg`
 
 ---
 
-*Last updated: April 2026 — v0.6*
+*Last updated: April 2026 — v0.7*

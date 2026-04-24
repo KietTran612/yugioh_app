@@ -8,6 +8,7 @@ import '../utils/app_theme.dart';
 import '../widgets/card_image.dart';
 import '../widgets/favorite_button.dart';
 import 'set_detail_screen.dart';
+import 'main_shell.dart' show tabPush;
 
 class CardDetailScreen extends StatelessWidget {
   final YugiohCard card;
@@ -249,7 +250,7 @@ class CardDetailScreen extends StatelessWidget {
   }
 
   void _showFullImage(BuildContext context, String imageUrl) {
-    Navigator.push(
+    tabPush(
       context,
       MaterialPageRoute(
         builder: (_) => _FullImageScreen(
@@ -849,7 +850,7 @@ class _CardSetsPanelState extends State<_CardSetsPanel> {
     setsAsync.whenData((sets) {
       final match = sets.where((s) => s.setName == setName);
       if (match.isNotEmpty) {
-        Navigator.push(
+        tabPush(
           context,
           MaterialPageRoute(
             builder: (_) => SetDetailScreen(setInfo: match.first),
