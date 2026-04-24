@@ -24,38 +24,62 @@ class FilterStateNotifier extends StateNotifier<FilterState> {
   // Multi-select toggles
   void toggleFrameType(String value) {
     final updated = Set<String>.from(state.frameTypes);
-    if (updated.contains(value))
+    if (updated.contains(value)) {
       updated.remove(value);
-    else
+    } else {
       updated.add(value);
+    }
     state = state.copyWith(frameTypes: updated);
   }
 
   void toggleAttribute(String value) {
     final updated = Set<String>.from(state.attributes);
-    if (updated.contains(value))
+    if (updated.contains(value)) {
       updated.remove(value);
-    else
+    } else {
       updated.add(value);
+    }
     state = state.copyWith(attributes: updated);
   }
 
   void toggleRace(String value) {
     final updated = Set<String>.from(state.races);
-    if (updated.contains(value))
+    if (updated.contains(value)) {
       updated.remove(value);
-    else
+    } else {
       updated.add(value);
+    }
     state = state.copyWith(races: updated);
   }
 
   void toggleLevel(int value) {
     final updated = Set<int>.from(state.levels);
-    if (updated.contains(value))
+    if (updated.contains(value)) {
       updated.remove(value);
-    else
+    } else {
       updated.add(value);
+    }
     state = state.copyWith(levels: updated);
+  }
+
+  void toggleBanlistStatus(String value) {
+    final updated = Set<String>.from(state.banlistStatuses);
+    if (updated.contains(value)) {
+      updated.remove(value);
+    } else {
+      updated.add(value);
+    }
+    state = state.copyWith(banlistStatuses: updated);
+  }
+
+  void toggleFormat(String value) {
+    final updated = Set<String>.from(state.formats);
+    if (updated.contains(value)) {
+      updated.remove(value);
+    } else {
+      updated.add(value);
+    }
+    state = state.copyWith(formats: updated);
   }
 
   // Single-select
@@ -110,6 +134,28 @@ List<YugiohCard> _applyFilter(List<YugiohCard> allCards, FilterState filter) {
     cards = cards
         .where((c) => c.level != null && filter.levels.contains(c.level))
         .toList();
+  }
+
+  // Banlist status filter — card matches if ANY selected format has that status
+  if (filter.banlistStatuses.isNotEmpty) {
+    cards = cards.where((c) {
+      final banlist = c.misc?.banlist;
+      if (banlist == null) return false;
+      final cardStatuses = <String>{
+        if (banlist.tcg != null) banlist.tcg!.label,
+        if (banlist.ocg != null) banlist.ocg!.label,
+        if (banlist.goat != null) banlist.goat!.label,
+      };
+      return cardStatuses.any((s) => filter.banlistStatuses.contains(s));
+    }).toList();
+  }
+
+  // Format filter — card must be playable in ALL selected formats (AND logic)
+  if (filter.formats.isNotEmpty) {
+    cards = cards.where((c) {
+      final cardFormats = c.misc?.formats ?? [];
+      return filter.formats.every((f) => cardFormats.contains(f));
+    }).toList();
   }
 
   // Single-select

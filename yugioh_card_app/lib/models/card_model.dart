@@ -103,10 +103,10 @@ class CardImage {
   });
 
   factory CardImage.fromJson(Map<String, dynamic> json) => CardImage(
-        id: json['id'] as int,
-        imageUrl: json['image_url'] as String? ?? '',
-        imageUrlSmall: json['image_url_small'] as String? ?? '',
-      );
+    id: json['id'] as int,
+    imageUrl: json['image_url'] as String? ?? '',
+    imageUrlSmall: json['image_url_small'] as String? ?? '',
+  );
 }
 
 class CardPrices {
@@ -123,11 +123,11 @@ class CardPrices {
   });
 
   factory CardPrices.fromJson(Map<String, dynamic> json) => CardPrices(
-        tcgplayer: json['tcgplayer'] as String? ?? '0.00',
-        cardmarket: json['cardmarket'] as String? ?? '0.00',
-        ebay: json['ebay'] as String? ?? '0.00',
-        amazon: json['amazon'] as String? ?? '0.00',
-      );
+    tcgplayer: json['tcgplayer'] as String? ?? '0.00',
+    cardmarket: json['cardmarket'] as String? ?? '0.00',
+    ebay: json['ebay'] as String? ?? '0.00',
+    amazon: json['amazon'] as String? ?? '0.00',
+  );
 }
 
 class CardSet {
@@ -144,11 +144,58 @@ class CardSet {
   });
 
   factory CardSet.fromJson(Map<String, dynamic> json) => CardSet(
-        setName: json['set_name'] as String? ?? '',
-        setCode: json['set_code'] as String? ?? '',
-        setRarity: json['set_rarity'] as String? ?? '',
-        setRarityCode: json['set_rarity_code'] as String? ?? '',
-      );
+    setName: json['set_name'] as String? ?? '',
+    setCode: json['set_code'] as String? ?? '',
+    setRarity: json['set_rarity'] as String? ?? '',
+    setRarityCode: json['set_rarity_code'] as String? ?? '',
+  );
+}
+
+/// Banlist status for a specific format.
+enum BanlistStatus {
+  forbidden,
+  limited,
+  semiLimited;
+
+  static BanlistStatus? fromString(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'forbidden':
+        return BanlistStatus.forbidden;
+      case 'limited':
+        return BanlistStatus.limited;
+      case 'semi-limited':
+        return BanlistStatus.semiLimited;
+      default:
+        return null;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case BanlistStatus.forbidden:
+        return 'Forbidden';
+      case BanlistStatus.limited:
+        return 'Limited';
+      case BanlistStatus.semiLimited:
+        return 'Semi-Limited';
+    }
+  }
+}
+
+class BanlistInfo {
+  final BanlistStatus? tcg;
+  final BanlistStatus? ocg;
+  final BanlistStatus? goat;
+
+  const BanlistInfo({this.tcg, this.ocg, this.goat});
+
+  bool get hasAny => tcg != null || ocg != null || goat != null;
+
+  factory BanlistInfo.fromJson(Map<String, dynamic> json) => BanlistInfo(
+    tcg: BanlistStatus.fromString(json['ban_tcg'] as String?),
+    ocg: BanlistStatus.fromString(json['ban_ocg'] as String?),
+    goat: BanlistStatus.fromString(json['ban_goat'] as String?),
+  );
 }
 
 class CardMisc {
@@ -156,22 +203,28 @@ class CardMisc {
   final String tcgDate;
   final String ocgDate;
   final int views;
+  final BanlistInfo? banlist;
 
   const CardMisc({
     required this.formats,
     required this.tcgDate,
     required this.ocgDate,
     required this.views,
+    this.banlist,
   });
 
-  factory CardMisc.fromJson(Map<String, dynamic> json) => CardMisc(
-        formats: (json['formats'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        tcgDate: json['tcg_date'] as String? ?? '',
-        ocgDate: json['ocg_date'] as String? ?? '',
-        views: json['views'] as int? ?? 0,
-      );
+  factory CardMisc.fromJson(Map<String, dynamic> json) {
+    final banlistJson = json['banlist_info'] as Map<String, dynamic>?;
+    return CardMisc(
+      formats: (json['formats'] as List<dynamic>? ?? [])
+          .map((e) => e as String)
+          .toList(),
+      tcgDate: json['tcg_date'] as String? ?? '',
+      ocgDate: json['ocg_date'] as String? ?? '',
+      views: json['views'] as int? ?? 0,
+      banlist: banlistJson != null ? BanlistInfo.fromJson(banlistJson) : null,
+    );
+  }
 }
 
 class FilterIndex {
@@ -192,23 +245,23 @@ class FilterIndex {
   });
 
   factory FilterIndex.fromJson(Map<String, dynamic> json) => FilterIndex(
-        types: (json['types'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        frameTypes: (json['frame_types'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        races: (json['races'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        attributes: (json['attributes'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        archetypes: (json['archetypes'] as List<dynamic>? ?? [])
-            .map((e) => e as String)
-            .toList(),
-        levels: (json['levels'] as List<dynamic>? ?? [])
-            .map((e) => e as int)
-            .toList(),
-      );
+    types: (json['types'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    frameTypes: (json['frame_types'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    races: (json['races'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    attributes: (json['attributes'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    archetypes: (json['archetypes'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
+        .toList(),
+    levels: (json['levels'] as List<dynamic>? ?? [])
+        .map((e) => e as int)
+        .toList(),
+  );
 }

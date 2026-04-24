@@ -219,6 +219,43 @@ flutter config --android-studio-dir "D:\soflware\Android\Android Studio"
 
 ## Changelog
 
+### v0.5 (April 2026)
+- **Dark "Duel Terminal" UI overhaul** — toàn bộ app chuyển sang dark theme cố định
+  - `AppTheme` class tập trung: màu sắc, ThemeData, helper methods
+  - Background: deep navy `#0A0E1A`, surface: `#111827`, elevated: `#1A2235`
+  - Accent: teal-green `#00C896`, gold `#FFB800`
+- **Card grid** — border + glow shadow màu theo attribute (DARK=tím, LIGHT=vàng, FIRE=đỏ...)
+  - Dùng `imageUrl` (full resolution) thay vì `imageUrlSmall`
+- **AppBar** — logo icon, filter button với dot indicator khi active
+- **Bottom nav** — pill highlight animation, custom `_DuelBottomNav`
+- **Card Detail Screen** — SliverAppBar, ATK/DEF badge riêng màu đỏ/xanh, rarity badge màu theo độ hiếm, "show more sets" expandable
+- **More Screen** — menu group style iOS-like, app info card
+- **Placeholder screens** (Sets, Collection, Watchlist) — dark theme consistent
+- **Favorites (Watchlist)** — local favorites với SharedPreferences
+  - `FavoritesService` — lưu/load Set<int> card IDs
+  - `favoritesProvider` + `favoriteCardsProvider` — StateNotifier
+  - `FavoriteButton` (compact, trên grid) + `FavoriteIconButton` (AppBar detail)
+  - Watchlist screen — grid card yêu thích, clear all, empty state
+- **Watchlist search/filter** — search bar + QuickFilterBar riêng cho Watchlist tab
+  - `watchlistFilterProvider` — FilterState độc lập với Home
+  - `filteredFavoriteCardsProvider` — filter chỉ trong danh sách yêu thích
+  - Result count badge, reset filter button
+- **Banlist status** — parse `banlist_info` từ API (card level, không trong `misc_info`)
+  - `BanlistStatus` enum: Forbidden / Limited / Semi-Limited
+  - `BanlistInfo` model trong `CardMisc`
+  - Hiển thị badge màu trên Card Detail (đỏ=Forbidden, vàng=Limited, xanh=Semi-Limited)
+  - Serialize/deserialize qua cache
+- **Filter: Banlist + Format** — 2 filter mới trong QuickFilterBar
+  - **Banlist filter** — multi-select: Forbidden / Limited / Semi-Limited (OR logic)
+  - **Format filter** — multi-select: TCG / OCG / Master Duel / GOAT (AND logic)
+  - Badge màu cho banlist chips, summary bar hiển thị cả 2 filter
+- **Bug fixes:**
+  - Fix `frameType` parse — API dùng `frame_type` (snake_case), không phải `frameType` (camelCase)
+  - Fix `banlist_info` parse — nằm ở card level, không trong `misc_info[0]`
+  - Fix price display — `'\$price'` → `'\$$price'` trong `_PricesPanel`
+  - Bump cache key `v2` → `v3` để force re-fetch với banlist data
+  - Fix if-without-braces warnings trong `FilterStateNotifier`
+
 ### v0.4 (April 2026)
 - **Bottom Navigation Bar** — 5 tabs: Home, Sets, Collection, Watchlist, More
 - **Multi-select filter** — Type, Attribute, Race, Level có thể chọn nhiều giá trị

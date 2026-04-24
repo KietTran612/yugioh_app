@@ -50,22 +50,29 @@ class CardNetworkImage extends StatelessWidget {
   }
 
   Widget _shimmer() => Shimmer.fromColors(
-    baseColor: Colors.grey[300]!,
-    highlightColor: Colors.grey[100]!,
-    child: Container(color: Colors.white, width: width, height: height),
+    baseColor: const Color(0xFF1A2235),
+    highlightColor: const Color(0xFF243050),
+    child: Container(
+      color: const Color(0xFF1A2235),
+      width: width,
+      height: height,
+    ),
   );
 
   Widget _placeholder() => Container(
-    color: Colors.grey[200],
+    color: const Color(0xFF111827),
     width: width,
     height: height,
-    child: const Icon(Icons.image_not_supported, color: Colors.grey),
+    child: const Icon(
+      Icons.image_not_supported_rounded,
+      color: Color(0xFF4A5568),
+    ),
   );
 
   Widget _errorWidget() => Container(
-    color: Colors.grey[200],
+    color: const Color(0xFF111827),
     width: width,
     height: height,
-    child: const Icon(Icons.broken_image, color: Colors.grey),
+    child: const Icon(Icons.broken_image_rounded, color: Color(0xFF4A5568)),
   );
 }

@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/card_model.dart';
 import '../models/filter_state.dart';
 import '../providers/card_provider.dart';
+import '../utils/app_theme.dart';
+
+// ── QuickFilterBar ─────────────────────────────────────────────────────────────
+// Accepts optional custom providers so it can be reused in Watchlist tab
+// with its own independent filter state.
 
 class QuickFilterBar extends ConsumerStatefulWidget {
-  const QuickFilterBar({super.key});
+  /// Provider for the filter state. Defaults to the global [filterStateProvider].
+  final StateNotifierProvider<FilterStateNotifier, FilterState>? filterProvider;
+
+  /// Provider for the filter index (available options). Defaults to [filterIndexProvider].
+  final ProviderBase<AsyncValue<FilterIndex>>? indexProvider;
+
+  const QuickFilterBar({super.key, this.filterProvider, this.indexProvider});
 
   @override
   ConsumerState<QuickFilterBar> createState() => _QuickFilterBarState();
@@ -24,6 +36,8 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     'Archetype',
     'ATK',
     'DEF',
+    'Banlist',
+    'Format',
     'Sort',
   ];
   static const _sectionHeights = {
@@ -34,6 +48,8 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     'Archetype': 100.0,
     'ATK': 90.0,
     'DEF': 90.0,
+    'Banlist': 90.0,
+    'Format': 90.0,
     'Sort': 120.0,
   };
   static const _sectionHeaderHeight = 44.0;
@@ -41,7 +57,14 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
 
   final _containerKey = GlobalKey();
   double _availableHeight = double.infinity;
-  final Set<String> _openSections = {'Type', 'Attribute'};
+  final List<String> _openSections = ['Type', 'Attribute'];
+
+  // Resolved providers (fallback to global defaults)
+  StateNotifierProvider<FilterStateNotifier, FilterState> get _filterProvider =>
+      widget.filterProvider ?? filterStateProvider;
+
+  ProviderBase<AsyncValue<FilterIndex>> get _indexProvider =>
+      widget.indexProvider ?? filterIndexProvider;
 
   @override
   void initState() {
@@ -72,7 +95,7 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     if (box == null || !box.hasSize) return;
     final offset = box.localToGlobal(Offset.zero);
     final screenHeight = MediaQuery.of(ctx).size.height;
-    final available = screenHeight - offset.dy - 32;
+    final available = screenHeight - offset.dy - 200;
     if (available > 0 && available != _availableHeight) {
       setState(() => _availableHeight = available);
     }
@@ -91,7 +114,7 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     }
   }
 
-  double _estimatedContentHeight(Set<String> openSections, bool hasActive) {
+  double _estimatedContentHeight(List<String> openSections, bool hasActive) {
     double h = 0;
     for (final key in _sectionOrder) {
       h += openSections.contains(key)
@@ -109,20 +132,24 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
         return;
       }
       _openSections.add(key);
-      for (final s in _sectionOrder) {
-        if (_estimatedContentHeight(_openSections, hasActive) <=
-            _availableHeight)
-          break;
-        if (s != key && _openSections.contains(s)) _openSections.remove(s);
+      while (_estimatedContentHeight(_openSections, hasActive) >
+              _availableHeight &&
+          _openSections.length > 1) {
+        final oldest = _openSections.firstWhere(
+          (s) => s != key,
+          orElse: () => '',
+        );
+        if (oldest.isEmpty) break;
+        _openSections.remove(oldest);
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final filter = ref.watch(filterStateProvider);
-    final filterAsync = ref.watch(filterIndexProvider);
-    final notifier = ref.read(filterStateProvider.notifier);
+    final filter = ref.watch(_filterProvider);
+    final filterAsync = ref.watch(_indexProvider);
+    final notifier = ref.read(_filterProvider.notifier);
     final hasActive = filter.hasActiveFilters;
 
     return Column(
@@ -132,36 +159,36 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
         // ── Toggle bar ──────────────────────────────────────────────────
         InkWell(
           onTap: _toggleMain,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
             decoration: BoxDecoration(
               color: hasActive
-                  ? Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer.withValues(alpha: 0.5)
-                  : Theme.of(context).colorScheme.surfaceContainerHighest
-                        .withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
+                  ? AppTheme.accent.withValues(alpha: 0.08)
+                  : AppTheme.bgElevated,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: hasActive
+                    ? AppTheme.accent.withValues(alpha: 0.4)
+                    : AppTheme.bgBorder,
+              ),
             ),
             child: Row(
               children: [
                 Icon(
-                  Icons.tune,
+                  Icons.tune_rounded,
                   size: 16,
-                  color: hasActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey,
+                  color: hasActive ? AppTheme.accent : AppTheme.textMuted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: hasActive
                       ? _ActiveFilterSummary(filter: filter)
-                      : Text(
+                      : const Text(
                           'Quick Filters',
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.grey[600],
+                            color: AppTheme.textMuted,
                           ),
                         ),
                 ),
@@ -170,13 +197,21 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                     onTap: notifier.reset,
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Icon(Icons.close, size: 16, color: Colors.grey),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: AppTheme.textMuted,
+                      ),
                     ),
                   ),
                 AnimatedRotation(
                   turns: _expanded ? 0.5 : 0,
                   duration: const Duration(milliseconds: 250),
-                  child: const Icon(Icons.keyboard_arrow_down, size: 20),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
               ],
             ),
@@ -188,19 +223,16 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
           sizeFactor: _expandAnim,
           child: filterAsync.when(
             loading: () => const SizedBox.shrink(),
-            error: (_, __) => const SizedBox.shrink(),
+            error: (_, _) => const SizedBox.shrink(),
             data: (index) => Container(
               margin: const EdgeInsets.only(top: 4),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+                color: AppTheme.bgCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.bgBorder),
               ),
               child: Column(
                 children: [
-                  // Type — multi-select
                   _CollapsibleSection(
                     title: 'Type',
                     isOpen: _openSections.contains('Type'),
@@ -214,7 +246,6 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                     ),
                   ),
                   _Divider(),
-                  // Attribute — multi-select
                   _CollapsibleSection(
                     title: 'Attribute',
                     isOpen: _openSections.contains('Attribute'),
@@ -228,7 +259,6 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                     ),
                   ),
                   _Divider(),
-                  // Race — multi-select
                   _CollapsibleSection(
                     title: 'Race / Type',
                     isOpen: _openSections.contains('Race'),
@@ -241,7 +271,6 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                     ),
                   ),
                   _Divider(),
-                  // Level — multi-select
                   _CollapsibleSection(
                     title: 'Level / Rank',
                     isOpen: _openSections.contains('Level'),
@@ -255,7 +284,6 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                     ),
                   ),
                   _Divider(),
-                  // Archetype — single-select
                   _CollapsibleSection(
                     title: 'Archetype',
                     isOpen: _openSections.contains('Archetype'),
@@ -303,6 +331,31 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                   ),
                   _Divider(),
                   _CollapsibleSection(
+                    title: 'Banlist',
+                    isOpen: _openSections.contains('Banlist'),
+                    activeCount: filter.banlistStatuses.length,
+                    onToggle: () => _toggleSection('Banlist', hasActive),
+                    child: _MultiChipGroup<String>(
+                      items: const ['Forbidden', 'Limited', 'Semi-Limited'],
+                      selected: filter.banlistStatuses,
+                      onTap: notifier.toggleBanlistStatus,
+                      colorBuilder: _banlistColor,
+                    ),
+                  ),
+                  _Divider(),
+                  _CollapsibleSection(
+                    title: 'Format',
+                    isOpen: _openSections.contains('Format'),
+                    activeCount: filter.formats.length,
+                    onToggle: () => _toggleSection('Format', hasActive),
+                    child: _MultiChipGroup<String>(
+                      items: const ['TCG', 'OCG', 'Master Duel', 'GOAT'],
+                      selected: filter.formats,
+                      onTap: notifier.toggleFormat,
+                    ),
+                  ),
+                  _Divider(),
+                  _CollapsibleSection(
                     title: 'Sort By',
                     isOpen: _openSections.contains('Sort'),
                     activeCount: 0,
@@ -314,10 +367,15 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                       child: OutlinedButton.icon(
                         onPressed: notifier.reset,
-                        icon: const Icon(Icons.filter_alt_off, size: 16),
+                        icon: const Icon(
+                          Icons.filter_alt_off_rounded,
+                          size: 16,
+                        ),
                         label: const Text('Reset All Filters'),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(36),
+                          foregroundColor: AppTheme.accent,
+                          side: const BorderSide(color: AppTheme.accent),
                         ),
                       ),
                     ),
@@ -364,6 +422,7 @@ class _CollapsibleSection extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
                   ),
                 ),
                 if (activeCount > 0) ...[
@@ -374,14 +433,14 @@ class _CollapsibleSection extends StatelessWidget {
                       vertical: 1,
                     ),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
+                      color: AppTheme.accent,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       '$activeCount',
                       style: const TextStyle(
                         fontSize: 10,
-                        color: Colors.white,
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -391,7 +450,11 @@ class _CollapsibleSection extends StatelessWidget {
                 AnimatedRotation(
                   turns: isOpen ? 0.5 : 0,
                   duration: const Duration(milliseconds: 200),
-                  child: const Icon(Icons.keyboard_arrow_down, size: 18),
+                  child: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: AppTheme.textMuted,
+                  ),
                 ),
               ],
             ),
@@ -413,7 +476,7 @@ class _CollapsibleSection extends StatelessWidget {
   }
 }
 
-// ── Multi-select chip group — 2 rows, horizontal scroll ───────────────────────
+// ── Multi-select chip group ────────────────────────────────────────────────────
 
 class _MultiChipGroup<T> extends StatelessWidget {
   final List<T> items;
@@ -442,14 +505,13 @@ class _MultiChipGroup<T> extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected
-              ? (chipColor ?? Theme.of(context).colorScheme.primary)
-              : (chipColor?.withValues(alpha: 0.1) ??
-                    Theme.of(context).colorScheme.surfaceContainerHighest),
+              ? (chipColor ?? AppTheme.accent).withValues(alpha: 0.2)
+              : AppTheme.bgElevated,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? (chipColor ?? Theme.of(context).colorScheme.primary)
-                : Colors.grey.withValues(alpha: 0.3),
+                ? (chipColor ?? AppTheme.accent)
+                : AppTheme.bgBorder,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -458,7 +520,9 @@ class _MultiChipGroup<T> extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? Colors.white : (chipColor ?? Colors.grey[700]),
+            color: isSelected
+                ? (chipColor ?? AppTheme.accent)
+                : AppTheme.textSecondary,
           ),
         ),
       ),
@@ -544,7 +608,10 @@ class _RangeInput extends StatelessWidget {
         ),
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: 8),
-          child: Text('–', style: TextStyle(fontSize: 16)),
+          child: Text(
+            '–',
+            style: TextStyle(fontSize: 16, color: AppTheme.textMuted),
+          ),
         ),
         Expanded(
           child: TextFormField(
@@ -591,13 +658,11 @@ class _SortSelector extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ? AppTheme.accent.withValues(alpha: 0.2)
+                      : AppTheme.bgElevated,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.withValues(alpha: 0.3),
+                    color: isSelected ? AppTheme.accent : AppTheme.bgBorder,
                   ),
                 ),
                 child: Text(
@@ -607,7 +672,9 @@ class _SortSelector extends StatelessWidget {
                     fontWeight: isSelected
                         ? FontWeight.bold
                         : FontWeight.normal,
-                    color: isSelected ? Colors.white : Colors.grey[700],
+                    color: isSelected
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary,
                   ),
                 ),
               ),
@@ -620,22 +687,27 @@ class _SortSelector extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer,
+              color: AppTheme.bgElevated,
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppTheme.bgBorder),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   filter.sortAscending
-                      ? Icons.arrow_upward
-                      : Icons.arrow_downward,
+                      ? Icons.arrow_upward_rounded
+                      : Icons.arrow_downward_rounded,
                   size: 14,
+                  color: AppTheme.textSecondary,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   filter.sortAscending ? 'Ascending' : 'Descending',
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -657,8 +729,9 @@ class _ActiveFilterSummary extends StatelessWidget {
     final parts = <String>[];
     if (filter.frameTypes.isNotEmpty) parts.add(filter.frameTypes.join(', '));
     if (filter.attributes.isNotEmpty) parts.add(filter.attributes.join(', '));
-    if (filter.levels.isNotEmpty)
+    if (filter.levels.isNotEmpty) {
       parts.add(filter.levels.map((v) => '★$v').join(', '));
+    }
     if (filter.races.isNotEmpty) parts.add(filter.races.join(', '));
     if (filter.archetype != null) parts.add(filter.archetype!);
     if (filter.atkMin != null || filter.atkMax != null) {
@@ -667,13 +740,19 @@ class _ActiveFilterSummary extends StatelessWidget {
     if (filter.defMin != null || filter.defMax != null) {
       parts.add('DEF ${filter.defMin ?? 0}–${filter.defMax ?? '∞'}');
     }
+    if (filter.banlistStatuses.isNotEmpty) {
+      parts.add(filter.banlistStatuses.join(', '));
+    }
+    if (filter.formats.isNotEmpty) {
+      parts.add(filter.formats.join(', '));
+    }
     if (filter.searchQuery.isNotEmpty) parts.add('"${filter.searchQuery}"');
 
     return Text(
       parts.join(' · '),
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 12,
-        color: Theme.of(context).colorScheme.primary,
+        color: AppTheme.accent,
         fontWeight: FontWeight.w500,
       ),
       overflow: TextOverflow.ellipsis,
@@ -685,11 +764,8 @@ class _ActiveFilterSummary extends StatelessWidget {
 
 class _Divider extends StatelessWidget {
   @override
-  Widget build(BuildContext context) => Divider(
-    height: 1,
-    thickness: 1,
-    color: Colors.grey.withValues(alpha: 0.15),
-  );
+  Widget build(BuildContext context) =>
+      const Divider(height: 1, thickness: 1, color: AppTheme.bgBorder);
 }
 
 // ── Color helpers ──────────────────────────────────────────────────────────────
@@ -738,6 +814,19 @@ Color _attributeColor(String attribute) {
       return const Color(0xFF2E7D32);
     case 'DIVINE':
       return const Color(0xFFE65100);
+    default:
+      return const Color(0xFF546E7A);
+  }
+}
+
+Color _banlistColor(String status) {
+  switch (status) {
+    case 'Forbidden':
+      return const Color(0xFFE74C3C);
+    case 'Limited':
+      return const Color(0xFFFFB800);
+    case 'Semi-Limited':
+      return const Color(0xFF3498DB);
     default:
       return const Color(0xFF546E7A);
   }

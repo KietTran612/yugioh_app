@@ -8,7 +8,7 @@ import '../models/card_model.dart';
 const _apiBase = 'https://db.ygoprodeck.com/api/v7';
 const _imageBase = 'https://images.ygoprodeck.com/images/cards';
 const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
-const _cacheKey = 'yugioh_cards_cache_v2';
+const _cacheKey = 'yugioh_cards_cache_v5';
 
 class CardDataService {
   static final _dio = Dio(
@@ -201,6 +201,15 @@ Map<String, dynamic> _cardToJson(YugiohCard c) {
             'tcg_date': c.misc!.tcgDate,
             'ocg_date': c.misc!.ocgDate,
             'views': c.misc!.views,
+            if (c.misc!.banlist != null)
+              'banlist_info': {
+                if (c.misc!.banlist!.tcg != null)
+                  'ban_tcg': c.misc!.banlist!.tcg!.label,
+                if (c.misc!.banlist!.ocg != null)
+                  'ban_ocg': c.misc!.banlist!.ocg!.label,
+                if (c.misc!.banlist!.goat != null)
+                  'ban_goat': c.misc!.banlist!.goat!.label,
+              },
           }
         : null,
   };
@@ -255,19 +264,28 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
 
     final miscList = card['misc_info'] as List<dynamic>? ?? [];
     final misc = miscList.isNotEmpty
-        ? {
-            'formats': (miscList[0] as Map<String, dynamic>)['formats'] ?? [],
-            'tcg_date': (miscList[0] as Map<String, dynamic>)['tcg_date'] ?? '',
-            'ocg_date': (miscList[0] as Map<String, dynamic>)['ocg_date'] ?? '',
-            'views': (miscList[0] as Map<String, dynamic>)['views'] ?? 0,
-          }
+        ? () {
+            final m = miscList[0] as Map<String, dynamic>;
+            final result = <String, dynamic>{
+              'formats': m['formats'] ?? [],
+              'tcg_date': m['tcg_date'] ?? '',
+              'ocg_date': m['ocg_date'] ?? '',
+              'views': m['views'] ?? 0,
+            };
+            return result;
+          }()
         : <String, dynamic>{};
+
+    // Banlist info is at card level, not inside misc_info
+    if (card['banlist_info'] != null) {
+      misc['banlist_info'] = card['banlist_info'];
+    }
 
     final normalized = <String, dynamic>{
       'id': card['id'],
       'name': card['name'] ?? '',
       'type': card['type'] ?? '',
-      'frame_type': card['frameType'] ?? '',
+      'frame_type': card['frameType'] ?? '', // API uses camelCase
       'desc': card['desc'] ?? '',
       'race': card['race'] ?? '',
       'archetype': card['archetype'] ?? '',
@@ -287,7 +305,7 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
       'misc': misc,
     };
 
-    final frameType = card['frameType'] as String? ?? '';
+    final frameType = card['frameType'] as String? ?? ''; // API uses camelCase
     if (frameType != 'spell' && frameType != 'trap') {
       normalized['atk'] = card['atk'];
       normalized['def'] = card['def'];
@@ -327,7 +345,17 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
       archetypes: archetypes.toList()..sort(),
       levels: levels.toList()..sort(),
     ),
-  );
+  )..let((result) {
+    debugPrint('[CardData] FilterIndex built:');
+    debugPrint('  - frameTypes: ${result.filterIndex.frameTypes.length} items');
+    debugPrint('  - attributes: ${result.filterIndex.attributes.length} items');
+    debugPrint('  - races: ${result.filterIndex.races.length} items');
+    if (result.filterIndex.frameTypes.isNotEmpty) {
+      debugPrint(
+        '  - frameTypes sample: ${result.filterIndex.frameTypes.take(5).join(", ")}',
+      );
+    }
+  });
 }
 
 // ── Result model ───────────────────────────────────────────────name────────────
@@ -336,4 +364,13 @@ class CardDataResult {
   final List<YugiohCard> cards;
   final FilterIndex filterIndex;
   const CardDataResult({required this.cards, required this.filterIndex});
+}
+
+// ── Extension helper ───────────────────────────────────────────────────────────
+
+extension _LetExtension<T> on T {
+  T let(void Function(T) block) {
+    block(this);
+    return this;
+  }
 }

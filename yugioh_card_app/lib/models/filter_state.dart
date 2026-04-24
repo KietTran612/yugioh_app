@@ -7,6 +7,8 @@ class FilterState {
   final Set<String> attributes; // e.g. {'DARK', 'LIGHT'}
   final Set<String> races; // e.g. {'Dragon', 'Warrior'}
   final Set<int> levels; // e.g. {4, 8}
+  final Set<String> banlistStatuses; // e.g. {'Forbidden', 'Limited'}
+  final Set<String> formats; // e.g. {'TCG', 'OCG', 'Master Duel'}
 
   // Single-select filters
   final String? archetype;
@@ -23,6 +25,8 @@ class FilterState {
     this.attributes = const {},
     this.races = const {},
     this.levels = const {},
+    this.banlistStatuses = const {},
+    this.formats = const {},
     this.archetype,
     this.atkMin,
     this.atkMax,
@@ -38,6 +42,8 @@ class FilterState {
       attributes.isNotEmpty ||
       races.isNotEmpty ||
       levels.isNotEmpty ||
+      banlistStatuses.isNotEmpty ||
+      formats.isNotEmpty ||
       archetype != null ||
       atkMin != null ||
       atkMax != null ||
@@ -50,6 +56,8 @@ class FilterState {
     Set<String>? attributes,
     Set<String>? races,
     Set<int>? levels,
+    Set<String>? banlistStatuses,
+    Set<String>? formats,
     Object? archetype = _sentinel,
     Object? atkMin = _sentinel,
     Object? atkMax = _sentinel,
@@ -64,6 +72,8 @@ class FilterState {
       attributes: attributes ?? this.attributes,
       races: races ?? this.races,
       levels: levels ?? this.levels,
+      banlistStatuses: banlistStatuses ?? this.banlistStatuses,
+      formats: formats ?? this.formats,
       archetype: archetype == _sentinel ? this.archetype : archetype as String?,
       atkMin: atkMin == _sentinel ? this.atkMin : atkMin as int?,
       atkMax: atkMax == _sentinel ? this.atkMax : atkMax as int?,

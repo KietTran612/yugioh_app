@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
 import 'home_screen.dart';
 import 'sets_screen.dart';
 import 'collection_screen.dart';
@@ -23,54 +24,137 @@ class _MainShellState extends State<MainShell> {
     MoreScreen(),
   ];
 
-  static const _items = [
-    BottomNavigationBarItem(
-      icon: Icon(Icons.home_outlined),
-      activeIcon: Icon(Icons.home_rounded),
+  static const _navItems = [
+    _NavItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
       label: 'Home',
     ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.list_alt_outlined),
-      activeIcon: Icon(Icons.list_alt_rounded),
+    _NavItem(
+      icon: Icons.layers_outlined,
+      activeIcon: Icons.layers_rounded,
       label: 'Sets',
     ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.style_outlined),
-      activeIcon: Icon(Icons.style_rounded),
+    _NavItem(
+      icon: Icons.style_outlined,
+      activeIcon: Icons.style_rounded,
       label: 'Collection',
     ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.bookmark_border_rounded),
-      activeIcon: Icon(Icons.bookmark_rounded),
+    _NavItem(
+      icon: Icons.bookmark_border_rounded,
+      activeIcon: Icons.bookmark_rounded,
       label: 'Watchlist',
     ),
-    BottomNavigationBarItem(
-      icon: Icon(Icons.more_horiz_rounded),
-      activeIcon: Icon(Icons.more_horiz_rounded),
+    _NavItem(
+      icon: Icons.more_horiz_rounded,
+      activeIcon: Icons.more_horiz_rounded,
       label: 'More',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: _DuelBottomNav(
         currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: colorScheme.primary,
-        unselectedItemColor: colorScheme.onSurface.withValues(alpha: 0.5),
-        backgroundColor: colorScheme.surface,
-        elevation: 8,
-        selectedLabelStyle: const TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+        items: _navItems,
+        onTap: (i) => setState(() => _currentIndex = i),
+      ),
+    );
+  }
+}
+
+// ── Custom bottom nav with pill indicator ──────────────────────────────────────
+
+class _NavItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+}
+
+class _DuelBottomNav extends StatelessWidget {
+  final int currentIndex;
+  final List<_NavItem> items;
+  final ValueChanged<int> onTap;
+
+  const _DuelBottomNav({
+    required this.currentIndex,
+    required this.items,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.bgCard,
+        border: Border(top: BorderSide(color: AppTheme.bgBorder, width: 1)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            children: List.generate(items.length, (i) {
+              final item = items[i];
+              final isActive = i == currentIndex;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onTap(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppTheme.accent.withValues(alpha: 0.15)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            isActive ? item.activeIcon : item.icon,
+                            size: 22,
+                            color: isActive
+                                ? AppTheme.accent
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: isActive
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isActive
+                                ? AppTheme.accent
+                                : AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
-        items: _items,
       ),
     );
   }

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/card_model.dart';
-import '../utils/card_colors.dart';
+import '../utils/app_theme.dart';
 import '../widgets/card_image.dart';
+import '../widgets/favorite_button.dart';
 
 class CardDetailScreen extends StatelessWidget {
   final YugiohCard card;
@@ -10,207 +11,252 @@ class CardDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final frameColor = frameTypeColor(card.frameType);
+    final frameColor = AppTheme.getFrameColor(card.frameType);
+    final attrColor = AppTheme.getAttributeColor(card.attribute);
+    final accentColor = card.attribute != null ? attrColor : frameColor;
 
     return Scaffold(
-      // Use theme background — no tinted overlay
-      appBar: AppBar(
-        title: Text(card.name, overflow: TextOverflow.ellipsis),
-        backgroundColor: frameColor,
-        foregroundColor: frameTypeTextColor(card.frameType),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Top section: image + stats ──────────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Card image — tap to view full size
-                GestureDetector(
-                  onTap: () => _showFullImage(context, card.imageUrl),
-                  child: Hero(
-                    tag: 'card_image_${card.id}',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CardNetworkImage(
-                        imageUrl: card.imageUrl,
-                        width: 160,
-                        height: 230,
-                        fit: BoxFit.cover,
+      backgroundColor: AppTheme.bgDeep,
+      body: CustomScrollView(
+        slivers: [
+          // ── Sliver AppBar with gradient ──────────────────────────────
+          SliverAppBar(
+            expandedHeight: 0,
+            pinned: true,
+            backgroundColor: AppTheme.bgDeep,
+            foregroundColor: AppTheme.textPrimary,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppTheme.bgElevated,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.bgBorder),
+                ),
+                child: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              card.name,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            actions: [
+              FavoriteIconButton(cardId: card.id),
+              const SizedBox(width: 4),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(height: 1, color: AppTheme.bgBorder),
+            ),
+          ),
+
+          // ── Body content ─────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Hero section: image + stats ──────────────────────
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Card image with glow
+                      GestureDetector(
+                        onTap: () => _showFullImage(context, card.imageUrl),
+                        child: Hero(
+                          tag: 'card_image_${card.id}',
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: accentColor.withValues(alpha: 0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CardNetworkImage(
+                                imageUrl: card.imageUrl,
+                                width: 150,
+                                height: 218,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+
+                      // Stats panel
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Type badge
+                            _TypeBadge(label: card.type, color: frameColor),
+                            const SizedBox(height: 10),
+
+                            // Attribute badge
+                            if (card.attribute != null) ...[
+                              _AttributeBadge(attribute: card.attribute!),
+                              const SizedBox(height: 10),
+                            ],
+
+                            // ATK / DEF
+                            if (card.isMonster) ...[
+                              Row(
+                                children: [
+                                  _StatBadge(
+                                    label: 'ATK',
+                                    value: card.atk != null
+                                        ? '${card.atk}'
+                                        : '?',
+                                    color: const Color(0xFFE74C3C),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (!card.isLink)
+                                    _StatBadge(
+                                      label: 'DEF',
+                                      value: card.def != null
+                                          ? '${card.def}'
+                                          : '?',
+                                      color: const Color(0xFF3498DB),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                            ],
+
+                            // Info rows
+                            _InfoChip(label: 'Race', value: card.race),
+
+                            if (card.level != null) ...[
+                              const SizedBox(height: 6),
+                              _InfoChip(
+                                label: card.isXyz
+                                    ? 'Rank'
+                                    : card.isLink
+                                    ? 'Link'
+                                    : 'Level',
+                                value: card.isLink
+                                    ? '${card.linkVal}'
+                                    : '${card.level}',
+                                icon: card.isXyz
+                                    ? Icons.circle
+                                    : Icons.star_rounded,
+                                iconColor: AppTheme.accentGold,
+                              ),
+                            ],
+
+                            if (card.archetype.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _InfoChip(
+                                label: 'Archetype',
+                                value: card.archetype,
+                              ),
+                            ],
+
+                            if (card.isPendulum && card.scale != null) ...[
+                              const SizedBox(height: 6),
+                              _InfoChip(label: 'Scale', value: '${card.scale}'),
+                            ],
+
+                            if (card.isLink && card.linkMarkers.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              _InfoChip(
+                                label: 'Markers',
+                                value: card.linkMarkers.join(', '),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ── Formats ──────────────────────────────────────────
+                  if (card.misc?.formats.isNotEmpty == true) ...[
+                    _SectionHeader(title: 'Formats'),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: card.misc!.formats
+                          .map((f) => _FormatChip(label: f))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // ── Banlist ───────────────────────────────────────────
+                  if (card.misc?.banlist?.hasAny == true) ...[
+                    _SectionHeader(title: 'Banlist Status'),
+                    const SizedBox(height: 10),
+                    _BanlistPanel(banlist: card.misc!.banlist!),
+                    const SizedBox(height: 20),
+                  ],
+
+                  // ── Card Text ─────────────────────────────────────────
+                  _SectionHeader(title: 'Card Text'),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.bgCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.bgBorder),
+                    ),
+                    child: SelectableText(
+                      card.desc.isNotEmpty ? card.desc : '—',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        height: 1.65,
+                        fontSize: 13.5,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
 
-                // Stats
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Frame type badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: frameColor,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          card.type,
-                          style: TextStyle(
-                            color: frameTypeTextColor(card.frameType),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      if (card.attribute != null) ...[
-                        _AttributeBadge(attribute: card.attribute!),
-                        const SizedBox(height: 8),
-                      ],
-
-                      _InfoRow(label: 'Race', value: card.race),
-
-                      if (card.level != null) ...[
-                        const SizedBox(height: 4),
-                        _InfoRow(
-                          label: card.isXyz
-                              ? 'Rank'
-                              : card.isLink
-                              ? 'Link'
-                              : 'Level',
-                          value: card.isLink
-                              ? '${card.linkVal}'
-                              : '${card.level}',
-                        ),
-                      ],
-
-                      if (card.isMonster) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _StatBadge(
-                              label: 'ATK',
-                              value: card.atk != null ? '${card.atk}' : '?',
-                            ),
-                            const SizedBox(width: 8),
-                            if (!card.isLink)
-                              _StatBadge(
-                                label: 'DEF',
-                                value: card.def != null ? '${card.def}' : '?',
-                              ),
-                          ],
-                        ),
-                      ],
-
-                      if (card.archetype.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        _InfoRow(label: 'Archetype', value: card.archetype),
-                      ],
-
-                      if (card.isPendulum && card.scale != null) ...[
-                        const SizedBox(height: 4),
-                        _InfoRow(label: 'Scale', value: '${card.scale}'),
-                      ],
-
-                      if (card.isLink && card.linkMarkers.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        _InfoRow(
-                          label: 'Markers',
-                          value: card.linkMarkers.join(', '),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Card Text ───────────────────────────────────────────────
-            _SectionHeader('Card Text'),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: SelectableText(
-                card.desc.isNotEmpty ? card.desc : '—',
-                style: const TextStyle(height: 1.6),
-              ),
-            ),
-
-            // ── Formats ─────────────────────────────────────────────────
-            if (card.misc?.formats.isNotEmpty == true) ...[
-              const SizedBox(height: 20),
-              _SectionHeader('Formats'),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: card.misc!.formats
-                    .map(
-                      (f) => Chip(
-                        label: Text(f),
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primaryContainer,
-                      ),
-                    )
-                    .toList(),
-              ),
-            ],
-
-            // ── Card Sets ────────────────────────────────────────────────
-            if (card.sets.isNotEmpty) ...[
-              const SizedBox(height: 20),
-              _SectionHeader('Card Sets (${card.sets.length})'),
-              const SizedBox(height: 8),
-              Card(
-                margin: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    ...card.sets.take(10).map((s) => _SetRow(cardSet: s)),
-                    if (card.sets.length > 10)
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(
-                          '+ ${card.sets.length - 10} more sets',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
+                  // ── Card Sets ─────────────────────────────────────────
+                  if (card.sets.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    _SectionHeader(
+                      title: 'Card Sets',
+                      trailing: '${card.sets.length}',
+                    ),
+                    const SizedBox(height: 10),
+                    _CardSetsPanel(sets: card.sets),
                   ],
-                ),
+
+                  // ── Prices ────────────────────────────────────────────
+                  if (card.prices != null) ...[
+                    const SizedBox(height: 20),
+                    _SectionHeader(title: 'Prices'),
+                    const SizedBox(height: 10),
+                    _PricesPanel(prices: card.prices!),
+                  ],
+
+                  const SizedBox(height: 40),
+                ],
               ),
-            ],
-
-            // ── Prices ───────────────────────────────────────────────────
-            if (card.prices != null) ...[
-              const SizedBox(height: 20),
-              _SectionHeader('Prices'),
-              const SizedBox(height: 8),
-              _PriceTable(prices: card.prices!),
-            ],
-
-            const SizedBox(height: 32),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -250,11 +296,12 @@ class _FullImageScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         title: Text(cardName),
+        elevation: 0,
       ),
       body: Center(
         child: InteractiveViewer(
           minScale: 0.5,
-          maxScale: 4.0,
+          maxScale: 5.0,
           child: Hero(
             tag: heroTag,
             child: CardNetworkImage(imageUrl: imageUrl, fit: BoxFit.contain),
@@ -269,147 +316,566 @@ class _FullImageScreen extends StatelessWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
-  const _SectionHeader(this.title);
+  final String? trailing;
+
+  const _SectionHeader({required this.title, this.trailing});
 
   @override
-  Widget build(BuildContext context) => Text(
-    title,
-    style: Theme.of(
-      context,
-    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-  );
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppTheme.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppTheme.bgElevated,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.bgBorder),
+            ),
+            child: Text(
+              trailing!,
+              style: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
-class _InfoRow extends StatelessWidget {
+class _TypeBadge extends StatelessWidget {
   final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
+  final Color color;
+
+  const _TypeBadge({required this.label, required this.color});
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: RichText(
-      text: TextSpan(
-        style: DefaultTextStyle.of(context).style,
-        children: [
-          TextSpan(
-            text: '$label: ',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          TextSpan(text: value),
-        ],
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-    ),
-  );
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
 }
 
 class _AttributeBadge extends StatelessWidget {
   final String attribute;
+
   const _AttributeBadge({required this.attribute});
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: attributeColor(attribute),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      attribute,
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
+  Widget build(BuildContext context) {
+    final color = AppTheme.getAttributeColor(attribute);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
       ),
-    ),
-  );
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            attribute,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StatBadge extends StatelessWidget {
   final String label;
   final String value;
-  const _StatBadge({required this.label, required this.value});
+  final Color color;
+
+  const _StatBadge({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-    decoration: BoxDecoration(
-      color: Colors.black87,
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(
-      '$label $value',
-      style: const TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-    ),
-  );
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color.withValues(alpha: 0.8),
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData? icon;
+  final Color? iconColor;
+
+  const _InfoChip({
+    required this.label,
+    required this.value,
+    this.icon,
+    this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 12, color: iconColor ?? AppTheme.textMuted),
+          const SizedBox(width: 4),
+        ],
+        Text(
+          '$label: ',
+          style: const TextStyle(
+            color: AppTheme.textMuted,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FormatChip extends StatelessWidget {
+  final String label;
+
+  const _FormatChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppTheme.accent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppTheme.accent,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Card Sets panel ────────────────────────────────────────────────────────────
+
+class _CardSetsPanel extends StatefulWidget {
+  final List<CardSet> sets;
+
+  const _CardSetsPanel({required this.sets});
+
+  @override
+  State<_CardSetsPanel> createState() => _CardSetsPanelState();
+}
+
+class _CardSetsPanelState extends State<_CardSetsPanel> {
+  bool _showAll = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final displaySets = _showAll ? widget.sets : widget.sets.take(5).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.bgBorder),
+      ),
+      child: Column(
+        children: [
+          ...displaySets.asMap().entries.map((entry) {
+            final i = entry.key;
+            final s = entry.value;
+            final isLast =
+                i == displaySets.length - 1 &&
+                (_showAll || widget.sets.length <= 5);
+            return _SetRow(cardSet: s, isLast: isLast);
+          }),
+          if (widget.sets.length > 5)
+            InkWell(
+              onTap: () => setState(() => _showAll = !_showAll),
+              borderRadius: const BorderRadius.vertical(
+                bottom: Radius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _showAll
+                          ? 'Show less'
+                          : '+ ${widget.sets.length - 5} more sets',
+                      style: const TextStyle(
+                        color: AppTheme.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      _showAll
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: AppTheme.accent,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SetRow extends StatelessWidget {
   final CardSet cardSet;
-  const _SetRow({required this.cardSet});
+  final bool isLast;
+
+  const _SetRow({required this.cardSet, this.isLast = false});
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    dense: true,
-    title: Text(cardSet.setName, style: const TextStyle(fontSize: 13)),
-    trailing: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          cardSet.setCode,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-        const SizedBox(width: 8),
-        Chip(
-          label: Text(cardSet.setRarity, style: const TextStyle(fontSize: 11)),
-          padding: EdgeInsets.zero,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-        ),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: AppTheme.bgBorder, width: 1),
+              ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              cardSet.setName,
+              style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            cardSet.setCode,
+            style: const TextStyle(
+              color: AppTheme.textMuted,
+              fontSize: 11,
+              fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: _rarityColor(cardSet.setRarity).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _rarityColor(cardSet.setRarity).withValues(alpha: 0.4),
+              ),
+            ),
+            child: Text(
+              cardSet.setRarity,
+              style: TextStyle(
+                color: _rarityColor(cardSet.setRarity),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _rarityColor(String rarity) {
+    final r = rarity.toLowerCase();
+    if (r.contains('secret')) return const Color(0xFFFF6B6B);
+    if (r.contains('ultimate')) return const Color(0xFFFFD700);
+    if (r.contains('ultra')) return const Color(0xFFFFB800);
+    if (r.contains('super')) return const Color(0xFF00C896);
+    if (r.contains('rare')) return const Color(0xFF74B9FF);
+    return AppTheme.textSecondary;
+  }
 }
 
-class _PriceTable extends StatelessWidget {
+// ── Prices panel ───────────────────────────────────────────────────────────────
+
+class _PricesPanel extends StatelessWidget {
   final CardPrices prices;
-  const _PriceTable({required this.prices});
+
+  const _PricesPanel({required this.prices});
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: EdgeInsets.zero,
-    child: Column(
-      children: [
-        _priceRow(context, 'TCGPlayer', prices.tcgplayer),
-        _priceRow(context, 'Cardmarket', prices.cardmarket),
-        _priceRow(context, 'eBay', prices.ebay),
-        _priceRow(context, 'Amazon', prices.amazon, isLast: true),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.bgBorder),
+      ),
+      child: Column(
+        children: [
+          _priceRow('TCGPlayer', prices.tcgplayer, Icons.store_rounded, false),
+          _priceRow(
+            'Cardmarket',
+            prices.cardmarket,
+            Icons.shopping_cart_rounded,
+            false,
+          ),
+          _priceRow('eBay', prices.ebay, Icons.gavel_rounded, false),
+          _priceRow(
+            'Amazon',
+            prices.amazon,
+            Icons.local_shipping_rounded,
+            true,
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _priceRow(
-    BuildContext context,
-    String market,
-    String price, {
-    bool isLast = false,
-  }) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      border: isLast
-          ? null
-          : Border(bottom: BorderSide(color: Colors.grey.shade200)),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(market, style: const TextStyle(fontWeight: FontWeight.w500)),
-        Text('\$$price', style: const TextStyle(fontWeight: FontWeight.bold)),
-      ],
-    ),
-  );
+  Widget _priceRow(String market, String price, IconData icon, bool isLast) {
+    final priceVal = double.tryParse(price) ?? 0.0;
+    final hasPrice = priceVal > 0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: AppTheme.bgBorder, width: 1),
+              ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppTheme.textMuted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              market,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            hasPrice ? '\$$price' : '—',
+            style: TextStyle(
+              color: hasPrice ? AppTheme.accent : AppTheme.textMuted,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: AppTheme.textMuted,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Banlist panel ──────────────────────────────────────────────────────────────
+
+class _BanlistPanel extends StatelessWidget {
+  final BanlistInfo banlist;
+
+  const _BanlistPanel({required this.banlist});
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <_BanlistEntry>[];
+    if (banlist.tcg != null) {
+      entries.add(_BanlistEntry(format: 'TCG', status: banlist.tcg!));
+    }
+    if (banlist.ocg != null) {
+      entries.add(_BanlistEntry(format: 'OCG', status: banlist.ocg!));
+    }
+    if (banlist.goat != null) {
+      entries.add(_BanlistEntry(format: 'GOAT', status: banlist.goat!));
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: entries.map((e) => _BanlistBadge(entry: e)).toList(),
+    );
+  }
+}
+
+class _BanlistEntry {
+  final String format;
+  final BanlistStatus status;
+  const _BanlistEntry({required this.format, required this.status});
+}
+
+class _BanlistBadge extends StatelessWidget {
+  final _BanlistEntry entry;
+
+  const _BanlistBadge({required this.entry});
+
+  Color get _statusColor {
+    switch (entry.status) {
+      case BanlistStatus.forbidden:
+        return const Color(0xFFE74C3C); // red
+      case BanlistStatus.limited:
+        return const Color(0xFFFFB800); // gold
+      case BanlistStatus.semiLimited:
+        return const Color(0xFF3498DB); // blue
+    }
+  }
+
+  IconData get _statusIcon {
+    switch (entry.status) {
+      case BanlistStatus.forbidden:
+        return Icons.block_rounded;
+      case BanlistStatus.limited:
+        return Icons.looks_one_rounded;
+      case BanlistStatus.semiLimited:
+        return Icons.looks_two_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _statusColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_statusIcon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                entry.format,
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.8),
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              Text(
+                entry.status.label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

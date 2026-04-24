@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/filter_state.dart';
 import '../providers/card_provider.dart';
+import '../utils/app_theme.dart';
 
 class FilterPanel extends ConsumerWidget {
   final ScrollController? scrollController;
@@ -12,17 +13,19 @@ class FilterPanel extends ConsumerWidget {
     final filterAsync = ref.watch(filterIndexProvider);
 
     return filterAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const Center(
+        child: CircularProgressIndicator(color: AppTheme.accent),
+      ),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (index) => Column(
         children: [
           // Drag handle
           Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            width: 40,
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[400],
+              color: AppTheme.textMuted,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -31,18 +34,19 @@ class FilterPanel extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
+                const Text(
                   'Filters',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                // Reset button — only watches hasActiveFilters
                 _ResetButton(),
               ],
             ),
           ),
-          const Divider(),
+          const Divider(color: AppTheme.bgBorder, height: 16),
           Expanded(
             child: ListView(
               controller: scrollController,
@@ -229,7 +233,7 @@ class _SortRow extends ConsumerWidget {
       children: [
         Expanded(
           child: DropdownButtonFormField<SortOption>(
-            value: sortBy,
+            initialValue: sortBy,
             decoration: _inputDecoration('Sort'),
             items: SortOption.values
                 .map((o) => DropdownMenuItem(value: o, child: Text(o.label)))
@@ -258,12 +262,28 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Text(
-      title,
-      style: Theme.of(
-        context,
-      ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(
+      children: [
+        Container(
+          width: 3,
+          height: 14,
+          decoration: BoxDecoration(
+            color: AppTheme.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -286,7 +306,7 @@ class _DropdownFilter<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       decoration: _inputDecoration(label),
       isExpanded: true,
       items: [
@@ -344,7 +364,21 @@ class _RangeRow extends StatelessWidget {
 
 InputDecoration _inputDecoration(String label) => InputDecoration(
   labelText: label,
-  border: const OutlineInputBorder(),
+  labelStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+  filled: true,
+  fillColor: AppTheme.bgElevated,
+  border: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: AppTheme.bgBorder),
+  ),
+  enabledBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: AppTheme.bgBorder),
+  ),
+  focusedBorder: OutlineInputBorder(
+    borderRadius: BorderRadius.circular(10),
+    borderSide: const BorderSide(color: AppTheme.accent, width: 1.5),
+  ),
   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
   isDense: true,
 );
@@ -380,15 +414,19 @@ class _MultiSelectDropdown<T> extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade400),
-            borderRadius: BorderRadius.circular(4),
+            color: AppTheme.bgElevated,
+            border: Border.all(color: AppTheme.bgBorder),
+            borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   '$label: $hint',
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppTheme.textPrimary,
+                  ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -399,14 +437,14 @@ class _MultiSelectDropdown<T> extends StatelessWidget {
                     vertical: 1,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: AppTheme.accent,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${selected.length}',
                     style: const TextStyle(
                       fontSize: 10,
-                      color: Colors.white,
+                      color: Colors.black,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -431,13 +469,11 @@ class _MultiSelectDropdown<T> extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ? AppTheme.accent.withValues(alpha: 0.2)
+                      : AppTheme.bgElevated,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.withValues(alpha: 0.3),
+                    color: isSelected ? AppTheme.accent : AppTheme.bgBorder,
                     width: isSelected ? 1.5 : 1,
                   ),
                 ),
@@ -448,7 +484,9 @@ class _MultiSelectDropdown<T> extends StatelessWidget {
                     fontWeight: isSelected
                         ? FontWeight.bold
                         : FontWeight.normal,
-                    color: isSelected ? Colors.white : Colors.grey[700],
+                    color: isSelected
+                        ? AppTheme.accent
+                        : AppTheme.textSecondary,
                   ),
                 ),
               ),
