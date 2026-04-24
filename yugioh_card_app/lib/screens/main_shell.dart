@@ -16,12 +16,13 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  static const _screens = [
-    HomeScreen(),
-    SetsScreen(),
-    CollectionScreen(),
-    WatchlistScreen(),
-    MoreScreen(),
+  // Navigator keys for each tab
+  final _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
   ];
 
   static const _navItems = [
@@ -54,13 +55,53 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
-      bottomNavigationBar: _DuelBottomNav(
-        currentIndex: _currentIndex,
-        items: _navItems,
-        onTap: (i) => setState(() => _currentIndex = i),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        // Try to pop current tab's navigator first
+        final currentNavigator = _navigatorKeys[_currentIndex].currentState;
+        if (currentNavigator != null && currentNavigator.canPop()) {
+          currentNavigator.pop();
+          return;
+        }
+
+        // If on Home tab and can't pop, exit app
+        if (_currentIndex == 0) {
+          // Let system handle back (exit app)
+          return;
+        }
+
+        // Otherwise go back to Home tab
+        setState(() => _currentIndex = 0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            _buildNavigator(0, const HomeScreen()),
+            _buildNavigator(1, const SetsScreen()),
+            _buildNavigator(2, const CollectionScreen()),
+            _buildNavigator(3, const WatchlistScreen()),
+            _buildNavigator(4, const MoreScreen()),
+          ],
+        ),
+        bottomNavigationBar: _DuelBottomNav(
+          currentIndex: _currentIndex,
+          items: _navItems,
+          onTap: (i) => setState(() => _currentIndex = i),
+        ),
       ),
+    );
+  }
+
+  Widget _buildNavigator(int index, Widget child) {
+    return Navigator(
+      key: _navigatorKeys[index],
+      onGenerateRoute: (settings) {
+        return MaterialPageRoute(builder: (_) => child, settings: settings);
+      },
     );
   }
 }

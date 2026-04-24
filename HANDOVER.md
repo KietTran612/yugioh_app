@@ -29,7 +29,8 @@ yugioh-card-app/
     │   ├── providers/
     │   │   ├── card_provider.dart   # cardDataProvider, filterStateProvider, filteredCardsProvider, filterIndexProvider
     │   │   ├── card_sets_provider.dart  # cardSetsProvider, setsFilterProvider, filteredSetsProvider
-    │   │   └── favorites_provider.dart  # favoritesProvider, favoriteCardsProvider
+    │   │   ├── favorites_provider.dart  # favoritesProvider, favoriteCardsProvider
+    │   │   └── translation_provider.dart # translationProvider (per-card state)
     │   ├── screens/
     │   │   ├── main_shell.dart      # Bottom navigation shell (5 tabs)
     │   │   ├── home_screen.dart     # Card grid, search bar, quick filter, pagination
@@ -40,7 +41,8 @@ yugioh-card-app/
     │   │   ├── watchlist_screen.dart    # Favorites grid với search/filter
     │   │   └── more_screen.dart     # Settings, Refresh, About
     │   ├── services/
-    │   │   └── card_data_service.dart   # Load/cache/fetch logic
+    │   │   ├── card_data_service.dart   # Load/cache/fetch logic
+    │   │   └── translation_service.dart # Google Translate API wrapper + cache
     │   ├── utils/
     │   │   └── card_colors.dart     # Màu theo frame type và attribute
     │   └── widgets/
@@ -62,6 +64,7 @@ yugioh-card-app/
 |---|---|---|
 | State management | `flutter_riverpod 2.6.1` | Provider, StateNotifier |
 | HTTP client | `dio 5.9.2` | Fetch từ YGOPRODeck API |
+| Translation | `translator 1.0.0` | Google Translate (unofficial API) |
 | Image cache | `cached_network_image 3.4.1` | Load ảnh card từ CDN (mobile/desktop) |
 | Local cache | `shared_preferences 2.5.5` | Cache JSON data |
 | Navigation | `go_router 14.8.1` | (setup sẵn, chưa dùng) |
@@ -146,8 +149,15 @@ App khởi động
 - ATK / DEF stats badge
 - Race, Level/Rank/Link, Archetype, Pendulum Scale, Link Markers
 - Card text — **có thể bôi đen và copy** (`SelectableText`)
+- **Translation** — tap icon 🌐 để dịch card text sang 11 ngôn ngữ (Vietnamese, Japanese, Korean, Chinese, Spanish, French, German, Italian, Portuguese, Russian, Thai)
+  - Dùng Google Translate API (unofficial, miễn phí)
+  - Cache local (SharedPreferences) — dịch 1 lần, lưu vĩnh viễn
+  - Lock mechanism — không cho dịch chồng chéo (global + per-card)
+  - Loading indicator + error handling
+  - Bản dịch hiển thị phía trên text gốc với style italic + note "Translated by Google"
+  - Tap X để đóng bản dịch
 - Formats (TCG/OCG/Master Duel)
-- Card Sets (tên set, mã set, rarity)
+- Card Sets (tên set, mã set, rarity) — **tap vào row để xem set detail**
 - Giá (TCGPlayer, Cardmarket, eBay, Amazon)
 
 ### Card Sets Screen
@@ -248,6 +258,13 @@ flutter config --android-studio-dir "D:\soflware\Android\Android Studio"
   - **Sets Screen**: search bar, sort bottom sheet (4 options), active sort label, cover image + rarity badge
   - **Set Detail Screen**: type filter chips (Monster/Spell/Trap), rarity filter chips, search trong set, stats pills
 - **Performance fix** — `_SetAccumulator` dùng `Set<int>` thay `List.any()` → O(1) duplicate check
+- **Translation feature** — dịch card text sang 11 ngôn ngữ
+  - `TranslationService` — wrapper Google Translate API (unofficial), cache local, global lock
+  - `TranslationProvider` — per-card state management (loading, error, translated text)
+  - `_CardTextSection` — UI với translate button, draggable language picker, loading/error states
+  - Hybrid approach: cache first → API call → cache result
+  - Lock mechanism: global `_isTranslating` + per-card `isLoading` → không cho dịch chồng chéo
+- **Navigation** — tap Card Sets row trong Card Detail → `SetDetailScreen`
 
 ### v0.5 (April 2026)
 - **Dark "Duel Terminal" UI overhaul** — toàn bộ app chuyển sang dark theme cố định
