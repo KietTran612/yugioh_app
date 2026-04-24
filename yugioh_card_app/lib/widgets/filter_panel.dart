@@ -111,12 +111,13 @@ class _FrameTypeDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final value = ref.watch(filterStateProvider.select((s) => s.frameType));
-    return _DropdownFilter<String>(
+    final selected = ref.watch(filterStateProvider.select((s) => s.frameTypes));
+    final notifier = ref.read(filterStateProvider.notifier);
+    return _MultiSelectDropdown<String>(
       label: 'Frame Type',
-      value: value,
       items: items,
-      onChanged: ref.read(filterStateProvider.notifier).setFrameType,
+      selected: selected,
+      onToggle: notifier.toggleFrameType,
     );
   }
 }
@@ -127,12 +128,13 @@ class _AttributeDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final value = ref.watch(filterStateProvider.select((s) => s.attribute));
-    return _DropdownFilter<String>(
+    final selected = ref.watch(filterStateProvider.select((s) => s.attributes));
+    final notifier = ref.read(filterStateProvider.notifier);
+    return _MultiSelectDropdown<String>(
       label: 'Attribute',
-      value: value,
       items: items,
-      onChanged: ref.read(filterStateProvider.notifier).setAttribute,
+      selected: selected,
+      onToggle: notifier.toggleAttribute,
     );
   }
 }
@@ -143,12 +145,13 @@ class _RaceDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final value = ref.watch(filterStateProvider.select((s) => s.race));
-    return _DropdownFilter<String>(
+    final selected = ref.watch(filterStateProvider.select((s) => s.races));
+    final notifier = ref.read(filterStateProvider.notifier);
+    return _MultiSelectDropdown<String>(
       label: 'Race',
-      value: value,
       items: items,
-      onChanged: ref.read(filterStateProvider.notifier).setRace,
+      selected: selected,
+      onToggle: notifier.toggleRace,
     );
   }
 }
@@ -159,13 +162,14 @@ class _LevelDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final value = ref.watch(filterStateProvider.select((s) => s.level));
-    return _DropdownFilter<int>(
+    final selected = ref.watch(filterStateProvider.select((s) => s.levels));
+    final notifier = ref.read(filterStateProvider.notifier);
+    return _MultiSelectDropdown<int>(
       label: 'Level / Rank',
-      value: value,
       items: items,
+      selected: selected,
       itemLabel: (v) => v.toString(),
-      onChanged: ref.read(filterStateProvider.notifier).setLevel,
+      onToggle: notifier.toggleLevel,
     );
   }
 }
@@ -344,3 +348,114 @@ InputDecoration _inputDecoration(String label) => InputDecoration(
   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
   isDense: true,
 );
+
+// ── Multi-select dropdown (shows selected count, opens wrap of chips) ──────────
+
+class _MultiSelectDropdown<T> extends StatelessWidget {
+  final String label;
+  final List<T> items;
+  final Set<T> selected;
+  final void Function(T) onToggle;
+  final String Function(T)? itemLabel;
+
+  const _MultiSelectDropdown({
+    required this.label,
+    required this.items,
+    required this.selected,
+    required this.onToggle,
+    this.itemLabel,
+  });
+
+  String _labelOf(T item) =>
+      itemLabel != null ? itemLabel!(item) : item.toString();
+
+  @override
+  Widget build(BuildContext context) {
+    final hint = selected.isEmpty ? 'All' : selected.map(_labelOf).join(', ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Summary row
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$label: $hint',
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (selected.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${selected.length}',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Chip wrap
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: items.map((item) {
+            final isSelected = selected.contains(item);
+            return GestureDetector(
+              onTap: () => onToggle(item),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey.withValues(alpha: 0.3),
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(
+                  _labelOf(item),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: isSelected ? Colors.white : Colors.grey[700],
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}

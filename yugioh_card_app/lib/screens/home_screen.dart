@@ -4,6 +4,7 @@ import '../providers/card_provider.dart';
 import '../services/card_data_service.dart';
 import '../widgets/card_item.dart';
 import '../widgets/filter_panel.dart';
+import '../widgets/quick_filter_bar.dart';
 import 'card_detail_screen.dart';
 
 const _pageSize = 50;
@@ -115,6 +116,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
 
+          // Quick filter bar
+          const Padding(
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: QuickFilterBar(),
+          ),
+
           // Card count
           cardsAsync
                   .whenData(
@@ -170,9 +177,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   padding: const EdgeInsets.all(12),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: _getCrossAxisCount(context),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 0.6,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 0.69, // Yu-Gi-Oh card ratio 59x86mm
                   ),
                   // +1 for loading indicator at bottom
                   itemCount: displayCards.length + (hasMore ? 1 : 0),

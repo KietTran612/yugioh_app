@@ -8,6 +8,7 @@ import '../services/card_data_service.dart';
 final cardDataProvider = FutureProvider<CardDataResult>((ref) async {
   return await CardDataService.loadCards();
 });
+
 // ── Filter state provider ─────────────────────────────────────────────────────
 
 final filterStateProvider =
@@ -19,11 +20,46 @@ class FilterStateNotifier extends StateNotifier<FilterState> {
   FilterStateNotifier() : super(const FilterState());
 
   void setSearch(String query) => state = state.copyWith(searchQuery: query);
-  void setFrameType(String? value) => state = state.copyWith(frameType: value);
-  void setAttribute(String? value) => state = state.copyWith(attribute: value);
-  void setRace(String? value) => state = state.copyWith(race: value);
+
+  // Multi-select toggles
+  void toggleFrameType(String value) {
+    final updated = Set<String>.from(state.frameTypes);
+    if (updated.contains(value))
+      updated.remove(value);
+    else
+      updated.add(value);
+    state = state.copyWith(frameTypes: updated);
+  }
+
+  void toggleAttribute(String value) {
+    final updated = Set<String>.from(state.attributes);
+    if (updated.contains(value))
+      updated.remove(value);
+    else
+      updated.add(value);
+    state = state.copyWith(attributes: updated);
+  }
+
+  void toggleRace(String value) {
+    final updated = Set<String>.from(state.races);
+    if (updated.contains(value))
+      updated.remove(value);
+    else
+      updated.add(value);
+    state = state.copyWith(races: updated);
+  }
+
+  void toggleLevel(int value) {
+    final updated = Set<int>.from(state.levels);
+    if (updated.contains(value))
+      updated.remove(value);
+    else
+      updated.add(value);
+    state = state.copyWith(levels: updated);
+  }
+
+  // Single-select
   void setArchetype(String? value) => state = state.copyWith(archetype: value);
-  void setLevel(int? value) => state = state.copyWith(level: value);
   void setAtkRange(int? min, int? max) =>
       state = state.copyWith(atkMin: min, atkMax: max);
   void setDefRange(int? min, int? max) =>
@@ -34,20 +70,17 @@ class FilterStateNotifier extends StateNotifier<FilterState> {
   void reset() => state = state.reset();
 }
 
-// ── Filtered cards provider (memoized) ───────────────────────────────────────
-// Only recomputes when cardData or filterState actually changes.
+// ── Filtered cards provider ───────────────────────────────────────────────────
 
 final filteredCardsProvider = Provider<AsyncValue<List<YugiohCard>>>((ref) {
   final dataAsync = ref.watch(cardDataProvider);
   final filter = ref.watch(filterStateProvider);
-
   return dataAsync.whenData((data) => _applyFilter(data.cards, filter));
 });
 
 List<YugiohCard> _applyFilter(List<YugiohCard> allCards, FilterState filter) {
   var cards = allCards;
 
-  // Only allocate new list when a filter is actually active
   if (filter.searchQuery.isNotEmpty) {
     final q = filter.searchQuery.toLowerCase();
     cards = cards
@@ -58,20 +91,30 @@ List<YugiohCard> _applyFilter(List<YugiohCard> allCards, FilterState filter) {
         )
         .toList();
   }
-  if (filter.frameType != null) {
-    cards = cards.where((c) => c.frameType == filter.frameType).toList();
+
+  // Multi-select: card must match ANY selected value (OR logic)
+  if (filter.frameTypes.isNotEmpty) {
+    cards = cards
+        .where((c) => filter.frameTypes.contains(c.frameType))
+        .toList();
   }
-  if (filter.attribute != null) {
-    cards = cards.where((c) => c.attribute == filter.attribute).toList();
+  if (filter.attributes.isNotEmpty) {
+    cards = cards
+        .where((c) => filter.attributes.contains(c.attribute))
+        .toList();
   }
-  if (filter.race != null) {
-    cards = cards.where((c) => c.race == filter.race).toList();
+  if (filter.races.isNotEmpty) {
+    cards = cards.where((c) => filter.races.contains(c.race)).toList();
   }
+  if (filter.levels.isNotEmpty) {
+    cards = cards
+        .where((c) => c.level != null && filter.levels.contains(c.level))
+        .toList();
+  }
+
+  // Single-select
   if (filter.archetype != null) {
     cards = cards.where((c) => c.archetype == filter.archetype).toList();
-  }
-  if (filter.level != null) {
-    cards = cards.where((c) => c.level == filter.level).toList();
   }
   if (filter.atkMin != null) {
     cards = cards
@@ -94,7 +137,7 @@ List<YugiohCard> _applyFilter(List<YugiohCard> allCards, FilterState filter) {
         .toList();
   }
 
-  // Sort — only copy list if needed
+  // Sort
   final sorted = List<YugiohCard>.from(cards);
   sorted.sort((a, b) {
     int cmp;

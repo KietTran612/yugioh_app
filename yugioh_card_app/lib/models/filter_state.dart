@@ -1,11 +1,15 @@
 /// Holds the current filter/search state for the card list.
 class FilterState {
   final String searchQuery;
-  final String? frameType;     // spell | trap | effect | fusion | synchro | xyz | link | ritual | pendulum | normal
-  final String? attribute;     // DARK | LIGHT | FIRE | WATER | EARTH | WIND | DIVINE
-  final String? race;          // Dragon | Warrior | Spellcaster | ...
+
+  // Multi-select filters
+  final Set<String> frameTypes; // e.g. {'effect', 'fusion'}
+  final Set<String> attributes; // e.g. {'DARK', 'LIGHT'}
+  final Set<String> races; // e.g. {'Dragon', 'Warrior'}
+  final Set<int> levels; // e.g. {4, 8}
+
+  // Single-select filters
   final String? archetype;
-  final int? level;
   final int? atkMin;
   final int? atkMax;
   final int? defMin;
@@ -15,11 +19,11 @@ class FilterState {
 
   const FilterState({
     this.searchQuery = '',
-    this.frameType,
-    this.attribute,
-    this.race,
+    this.frameTypes = const {},
+    this.attributes = const {},
+    this.races = const {},
+    this.levels = const {},
     this.archetype,
-    this.level,
     this.atkMin,
     this.atkMax,
     this.defMin,
@@ -30,11 +34,11 @@ class FilterState {
 
   bool get hasActiveFilters =>
       searchQuery.isNotEmpty ||
-      frameType != null ||
-      attribute != null ||
-      race != null ||
+      frameTypes.isNotEmpty ||
+      attributes.isNotEmpty ||
+      races.isNotEmpty ||
+      levels.isNotEmpty ||
       archetype != null ||
-      level != null ||
       atkMin != null ||
       atkMax != null ||
       defMin != null ||
@@ -42,11 +46,11 @@ class FilterState {
 
   FilterState copyWith({
     String? searchQuery,
-    Object? frameType = _sentinel,
-    Object? attribute = _sentinel,
-    Object? race = _sentinel,
+    Set<String>? frameTypes,
+    Set<String>? attributes,
+    Set<String>? races,
+    Set<int>? levels,
     Object? archetype = _sentinel,
-    Object? level = _sentinel,
     Object? atkMin = _sentinel,
     Object? atkMax = _sentinel,
     Object? defMin = _sentinel,
@@ -56,11 +60,11 @@ class FilterState {
   }) {
     return FilterState(
       searchQuery: searchQuery ?? this.searchQuery,
-      frameType: frameType == _sentinel ? this.frameType : frameType as String?,
-      attribute: attribute == _sentinel ? this.attribute : attribute as String?,
-      race: race == _sentinel ? this.race : race as String?,
+      frameTypes: frameTypes ?? this.frameTypes,
+      attributes: attributes ?? this.attributes,
+      races: races ?? this.races,
+      levels: levels ?? this.levels,
       archetype: archetype == _sentinel ? this.archetype : archetype as String?,
-      level: level == _sentinel ? this.level : level as int?,
       atkMin: atkMin == _sentinel ? this.atkMin : atkMin as int?,
       atkMax: atkMax == _sentinel ? this.atkMax : atkMax as int?,
       defMin: defMin == _sentinel ? this.defMin : defMin as int?,
@@ -73,16 +77,9 @@ class FilterState {
   FilterState reset() => const FilterState();
 }
 
-// Sentinel object to distinguish null from "not provided"
 const _sentinel = Object();
 
-enum SortOption {
-  name,
-  atk,
-  def,
-  level,
-  type,
-}
+enum SortOption { name, atk, def, level, type }
 
 extension SortOptionLabel on SortOption {
   String get label {

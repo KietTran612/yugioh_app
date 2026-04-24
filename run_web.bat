@@ -34,6 +34,6 @@ echo  Press 'R' to hot restart
 echo  Press 'q' to quit
 echo.
 
-call "%FLUTTER%" run -d chrome --web-port 8080
+call "%FLUTTER%" run -d chrome --web-port 8080 --web-browser-flag "--disable-web-security"
 
 pause
