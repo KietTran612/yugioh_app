@@ -27,14 +27,17 @@ yugioh-card-app/
     │   │   ├── card_model.dart      # YugiohCard, CardImage, CardPrices, CardSet, CardMisc, FilterIndex
     │   │   └── filter_state.dart    # FilterState (multi-select), FilterStateNotifier, SortOption
     │   ├── providers/
-    │   │   └── card_provider.dart   # cardDataProvider, filterStateProvider, filteredCardsProvider, filterIndexProvider
+    │   │   ├── card_provider.dart   # cardDataProvider, filterStateProvider, filteredCardsProvider, filterIndexProvider
+    │   │   ├── card_sets_provider.dart  # cardSetsProvider, setsFilterProvider, filteredSetsProvider
+    │   │   └── favorites_provider.dart  # favoritesProvider, favoriteCardsProvider
     │   ├── screens/
     │   │   ├── main_shell.dart      # Bottom navigation shell (5 tabs)
     │   │   ├── home_screen.dart     # Card grid, search bar, quick filter, pagination
     │   │   ├── card_detail_screen.dart  # Chi tiết card: ảnh, stats, sets, prices
-    │   │   ├── sets_screen.dart     # Card Sets (placeholder)
+    │   │   ├── sets_screen.dart     # Card Sets list với search + sort
+    │   │   ├── set_detail_screen.dart   # Card grid trong 1 set với filter type/rarity
     │   │   ├── collection_screen.dart   # My Collection (placeholder)
-    │   │   ├── watchlist_screen.dart    # Watchlist (placeholder)
+    │   │   ├── watchlist_screen.dart    # Favorites grid với search/filter
     │   │   └── more_screen.dart     # Settings, Refresh, About
     │   ├── services/
     │   │   └── card_data_service.dart   # Load/cache/fetch logic
@@ -102,9 +105,9 @@ App khởi động
 
 ### Navigation (Bottom Bar)
 - **Home** — card grid chính
-- **Sets** — placeholder (coming soon)
+- **Sets** — danh sách card sets, search + sort, tap vào xem card trong set
 - **Collection** — placeholder (coming soon)
-- **Watchlist** — placeholder (coming soon)
+- **Watchlist** — favorites grid với search/filter
 - **More** — Refresh Data, About
 - Dùng `IndexedStack` — giữ state từng tab khi switch
 
@@ -146,6 +149,23 @@ App khởi động
 - Formats (TCG/OCG/Master Duel)
 - Card Sets (tên set, mã set, rarity)
 - Giá (TCGPlayer, Cardmarket, eBay, Amazon)
+
+### Card Sets Screen
+- Derive data từ `YugiohCard.sets` — không cần API riêng
+- Danh sách tất cả sets (~700+), mỗi item hiển thị: cover image, tên set, set code, card count, top rarity badge
+- **Search** theo tên set hoặc set code
+- **Sort** (bottom sheet): Name A→Z, Name Z→A, Most Cards, Fewest Cards
+- Active sort label hiển thị inline dưới count badge
+- Tap vào set → `SetDetailScreen`
+
+### Set Detail Screen
+- Grid card trong set, sort theo set code (số thứ tự card trong set)
+- **Type filter chips**: All / Monster / Spell / Trap
+- **Rarity filter chips**: All + tất cả rarity có trong set
+- **Search** trong set theo tên, race, type
+- Stats pills: tổng card, số rarity, số card đang hiển thị sau filter
+- `CardSetInfo` được pre-compute (coverImageUrl, topRarity) — không tính lại mỗi build
+- `_buildSets()` chạy qua `compute()` trên isolate (mobile/desktop), main thread trên web
 
 ### Refresh Data
 - Nút Refresh (🔄) trên AppBar Home + tab More
@@ -219,6 +239,16 @@ flutter config --android-studio-dir "D:\soflware\Android\Android Studio"
 
 ## Changelog
 
+### v0.6 (April 2026)
+- **Card Sets tab** — hoàn thiện từ placeholder thành tính năng đầy đủ
+  - `CardSetInfo` model — derive từ `YugiohCard.sets`, pre-compute `coverImageUrl` + `topRarity`
+  - `cardSetsProvider` — `FutureProvider`, chạy `_buildSets()` qua `compute()` isolate (non-web)
+  - `SetsFilterState` + `SetsFilterNotifier` — quản lý search + sort độc lập
+  - `filteredSetsProvider` — apply search + sort, cached bởi Riverpod
+  - **Sets Screen**: search bar, sort bottom sheet (4 options), active sort label, cover image + rarity badge
+  - **Set Detail Screen**: type filter chips (Monster/Spell/Trap), rarity filter chips, search trong set, stats pills
+- **Performance fix** — `_SetAccumulator` dùng `Set<int>` thay `List.any()` → O(1) duplicate check
+
 ### v0.5 (April 2026)
 - **Dark "Duel Terminal" UI overhaul** — toàn bộ app chuyển sang dark theme cố định
   - `AppTheme` class tập trung: màu sắc, ThemeData, helper methods
@@ -285,9 +315,8 @@ flutter config --android-studio-dir "D:\soflware\Android\Android Studio"
 
 ## Hướng phát triển tiếp theo
 
-- [ ] **Sets** — danh sách card sets, filter theo set
+- [x] **Sets** — danh sách card sets, filter theo set ✅ v0.6
 - [ ] **Collection** — quản lý bộ sưu tập cá nhân
-- [ ] **Watchlist** — theo dõi giá card
 - [ ] **Web cache** — dùng IndexedDB thay localStorage
 - [ ] **Dark/Light theme toggle**
 - [ ] **Deck Builder** — tạo và lưu deck
@@ -313,4 +342,4 @@ Image CDN:
 
 ---
 
-*Last updated: April 2026 — v0.4*
+*Last updated: April 2026 — v0.6*
