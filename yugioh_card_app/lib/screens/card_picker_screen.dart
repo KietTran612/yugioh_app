@@ -7,7 +7,7 @@ import '../providers/card_provider.dart';
 import '../providers/deck_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/card_image.dart';
-import 'card_picker_sheet.dart';
+import '../widgets/card_picker_sheet.dart';
 
 // ── Hard-filter helpers ────────────────────────────────────────────────────────
 

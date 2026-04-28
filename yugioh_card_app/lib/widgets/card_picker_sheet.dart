@@ -4,7 +4,7 @@ import '../models/card_model.dart';
 import '../models/deck_model.dart';
 import '../providers/deck_provider.dart';
 import '../utils/app_theme.dart';
-import '../widgets/card_image.dart';
+import 'card_image.dart';
 
 /// Bottom sheet để add/remove card vào một deck cụ thể.
 /// Dùng chung từ CardPickerScreen và bất kỳ nơi nào cần.

@@ -132,16 +132,38 @@ class Deck {
       final banlist = card.misc?.banlist;
       if (banlist == null) continue;
 
-      // Master Duel: lấy status nghiêm nhất giữa TCG và OCG
+      // Master Duel: lấy status nghiêm nhất giữa TCG và OCG + ghi rõ nguồn
       // (API không có ban_md riêng, dùng union để không bỏ sót)
       // Duel Links: dùng OCG
       final BanlistStatus? status;
+      final String src; // nguồn luật để hiển thị trong warning
       switch (format) {
         case DeckFormat.masterDuel:
-          status = _stricterStatus(banlist.tcg, banlist.ocg);
+          final tcg = banlist.tcg;
+          final ocg = banlist.ocg;
+          if (tcg == null && ocg == null) {
+            status = null;
+            src = '';
+          } else if (tcg == null) {
+            status = ocg;
+            src = ' (OCG)';
+          } else if (ocg == null) {
+            status = tcg;
+            src = ' (TCG)';
+          } else if (tcg.index < ocg.index) {
+            status = tcg;
+            src = ' (TCG)';
+          } else if (ocg.index < tcg.index) {
+            status = ocg;
+            src = ' (OCG)';
+          } else {
+            status = tcg; // cùng mức
+            src = ' (TCG+OCG)';
+          }
           break;
         case DeckFormat.duelLinks:
           status = banlist.ocg;
+          src = banlist.ocg != null ? ' (OCG)' : '';
           break;
       }
 
@@ -150,19 +172,19 @@ class Deck {
 
       switch (status) {
         case BanlistStatus.forbidden:
-          errors.add('\x00${card.name}\x00Forbidden in ${config.label}');
+          errors.add('\x00${card.name}\x00Forbidden in ${config.label}$src');
           break;
         case BanlistStatus.limited:
           if (copies > 1) {
             errors.add(
-              '\x00${card.name}\x00Limited — max 1 copy (you have $copies)',
+              '\x00${card.name}\x00Limited — max 1 copy (you have $copies)$src',
             );
           }
           break;
         case BanlistStatus.semiLimited:
           if (copies > 2) {
             errors.add(
-              '\x00${card.name}\x00Semi-Limited — max 2 copies (you have $copies)',
+              '\x00${card.name}\x00Semi-Limited — max 2 copies (you have $copies)$src',
             );
           }
           break;
@@ -170,14 +192,6 @@ class Deck {
     }
 
     return errors;
-  }
-
-  /// Trả về status nghiêm hơn giữa hai status (Forbidden > Limited > Semi-Limited > null).
-  static BanlistStatus? _stricterStatus(BanlistStatus? a, BanlistStatus? b) {
-    if (a == null) return b;
-    if (b == null) return a;
-    // Thứ tự nghiêm: forbidden(0) > limited(1) > semiLimited(2)
-    return a.index <= b.index ? a : b;
   }
 
   Deck copyWith({
