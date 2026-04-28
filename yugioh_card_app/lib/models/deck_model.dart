@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'card_model.dart';
 
 // ── Format config ──────────────────────────────────────────────────────────────
 
@@ -112,6 +113,72 @@ class Deck {
   }
 
   bool get isValid => validate().isEmpty;
+
+  /// Validate với card data — thêm cảnh báo Forbidden/Limited/Semi-Limited.
+  /// [cardMap] là map từ card ID → YugiohCard để lookup nhanh.
+  List<String> validateWithCards(Map<int, YugiohCard> cardMap) {
+    final errors = validate();
+
+    // Count copies per card across all zones
+    final allIds = [...mainDeck, ...extraDeck, ...sideDeck];
+    final counts = <int, int>{};
+    for (final id in allIds) {
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+
+    for (final entry in counts.entries) {
+      final card = cardMap[entry.key];
+      if (card == null) continue;
+      final banlist = card.misc?.banlist;
+      if (banlist == null) continue;
+
+      // Master Duel: lấy status nghiêm nhất giữa TCG và OCG
+      // (API không có ban_md riêng, dùng union để không bỏ sót)
+      // Duel Links: dùng OCG
+      final BanlistStatus? status;
+      switch (format) {
+        case DeckFormat.masterDuel:
+          status = _stricterStatus(banlist.tcg, banlist.ocg);
+          break;
+        case DeckFormat.duelLinks:
+          status = banlist.ocg;
+          break;
+      }
+
+      if (status == null) continue;
+      final copies = entry.value;
+
+      switch (status) {
+        case BanlistStatus.forbidden:
+          errors.add('\x00${card.name}\x00Forbidden in ${config.label}');
+          break;
+        case BanlistStatus.limited:
+          if (copies > 1) {
+            errors.add(
+              '\x00${card.name}\x00Limited — max 1 copy (you have $copies)',
+            );
+          }
+          break;
+        case BanlistStatus.semiLimited:
+          if (copies > 2) {
+            errors.add(
+              '\x00${card.name}\x00Semi-Limited — max 2 copies (you have $copies)',
+            );
+          }
+          break;
+      }
+    }
+
+    return errors;
+  }
+
+  /// Trả về status nghiêm hơn giữa hai status (Forbidden > Limited > Semi-Limited > null).
+  static BanlistStatus? _stricterStatus(BanlistStatus? a, BanlistStatus? b) {
+    if (a == null) return b;
+    if (b == null) return a;
+    // Thứ tự nghiêm: forbidden(0) > limited(1) > semiLimited(2)
+    return a.index <= b.index ? a : b;
+  }
 
   Deck copyWith({
     String? name,

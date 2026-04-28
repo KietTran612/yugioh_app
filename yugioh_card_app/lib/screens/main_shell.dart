@@ -102,12 +102,11 @@ class _MainShellState extends State<MainShell> {
           isAtRoot: _isAtRoot,
           items: _navItems,
           onTap: (i) {
-            if (i == _currentIndex) {
-              _navigatorKeys[i].currentState?.popUntil((r) => r.isFirst);
-              if (!_isAtRoot[i]) setState(() => _isAtRoot[i] = true);
-            } else {
-              setState(() => _currentIndex = i);
-            }
+            // Always pop to root of the tapped tab, regardless of whether
+            // it's the current tab or a different one.
+            _navigatorKeys[i].currentState?.popUntil((r) => r.isFirst);
+            if (!_isAtRoot[i]) setState(() => _isAtRoot[i] = true);
+            if (i != _currentIndex) setState(() => _currentIndex = i);
           },
         ),
       ),

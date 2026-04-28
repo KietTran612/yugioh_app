@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/card_model.dart';
 import '../models/deck_model.dart';
+import '../providers/card_provider.dart';
 import '../providers/deck_provider.dart';
 import '../utils/app_theme.dart';
 import '../widgets/card_image.dart';
 import 'card_detail_screen.dart';
+import 'card_picker_screen.dart';
 import 'main_shell.dart' show tabPush;
 
 class DeckDetailScreen extends ConsumerWidget {
@@ -31,7 +33,7 @@ class DeckDetailScreen extends ConsumerWidget {
     }
 
     final deckCardsAsync = ref.watch(deckCardsProvider(deckId));
-    final errors = deck.validate();
+    final cardDataAsync = ref.watch(cardDataProvider);
     final cfg = deck.config;
 
     return Scaffold(
@@ -88,8 +90,21 @@ class DeckDetailScreen extends ConsumerWidget {
             style: const TextStyle(color: AppTheme.textMuted),
           ),
         ),
-        data: (cards) =>
-            _DeckBody(deck: deck, cards: cards, errors: errors, ref: ref),
+        data: (cards) {
+          // Build cardMap từ toàn bộ card data để validateWithCards
+          // có thể lookup forbidden status (không chỉ cards đang trong deck)
+          final cardMap =
+              cardDataAsync
+                  .whenData(
+                    (data) => <int, YugiohCard>{
+                      for (final c in data.cards) c.id: c,
+                    },
+                  )
+                  .valueOrNull ??
+              {};
+          final errors = deck.validateWithCards(cardMap);
+          return _DeckBody(deck: deck, cards: cards, errors: errors, ref: ref);
+        },
       ),
     );
   }
@@ -209,24 +224,20 @@ class _DeckBody extends StatelessWidget {
                 children: errors
                     .map(
                       (e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
+                        padding: const EdgeInsets.only(bottom: 6),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.warning_amber_rounded,
-                              size: 14,
-                              color: Color(0xFFE74C3C),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                e,
-                                style: const TextStyle(
-                                  color: Color(0xFFE74C3C),
-                                  fontSize: 12,
-                                ),
+                            const Padding(
+                              padding: EdgeInsets.only(top: 1),
+                              child: Icon(
+                                Icons.warning_amber_rounded,
+                                size: 14,
+                                color: Color(0xFFE74C3C),
                               ),
                             ),
+                            const SizedBox(width: 6),
+                            Expanded(child: _ErrorText(message: e)),
                           ],
                         ),
                       ),
@@ -244,6 +255,7 @@ class _DeckBody extends StatelessWidget {
           cards: cards.main,
           deckId: deck.id,
           zone: DeckZone.main,
+          deckFormat: deck.format,
           ref: ref,
         ),
 
@@ -256,6 +268,7 @@ class _DeckBody extends StatelessWidget {
             cards: cards.extra,
             deckId: deck.id,
             zone: DeckZone.extra,
+            deckFormat: deck.format,
             ref: ref,
           ),
 
@@ -268,6 +281,7 @@ class _DeckBody extends StatelessWidget {
             cards: cards.side,
             deckId: deck.id,
             zone: DeckZone.side,
+            deckFormat: deck.format,
             ref: ref,
           ),
 
@@ -286,6 +300,7 @@ class _CardZoneSection extends StatelessWidget {
   final List<YugiohCard> cards;
   final String deckId;
   final DeckZone zone;
+  final DeckFormat deckFormat;
   final WidgetRef ref;
 
   const _CardZoneSection({
@@ -295,8 +310,16 @@ class _CardZoneSection extends StatelessWidget {
     required this.cards,
     required this.deckId,
     required this.zone,
+    required this.deckFormat,
     required this.ref,
   });
+
+  void _openPicker(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CardPickerScreen(deckId: deckId)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -346,48 +369,87 @@ class _CardZoneSection extends StatelessWidget {
                     ),
                   ),
                 ),
+                const Spacer(),
+                // Nút + để mở card picker
+                GestureDetector(
+                  onTap: () => _openPicker(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _zoneColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _zoneColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Icon(Icons.add_rounded, size: 16, color: _zoneColor),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
 
             // Card grid or empty
             if (cards.isEmpty)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                decoration: BoxDecoration(
-                  color: AppTheme.bgCard,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppTheme.bgBorder,
-                    style: BorderStyle.solid,
+              GestureDetector(
+                onTap: () => _openPicker(context),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  decoration: BoxDecoration(
+                    color: AppTheme.bgCard,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.bgBorder,
+                      style: BorderStyle.solid,
+                    ),
                   ),
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.add_circle_outline_rounded,
-                      size: 32,
-                      color: AppTheme.textMuted,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No cards yet',
-                      style: const TextStyle(
-                        color: AppTheme.textMuted,
-                        fontSize: 13,
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _zoneColor.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _zoneColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Icon(
+                          Icons.add_rounded,
+                          size: 28,
+                          color: _zoneColor,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Add cards from card detail screen',
-                      style: TextStyle(color: AppTheme.textMuted, fontSize: 11),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      Text(
+                        'Tap to add cards',
+                        style: TextStyle(
+                          color: _zoneColor.withValues(alpha: 0.8),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Browse and search all cards',
+                        style: TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
-              _CardGrid(cards: cards, deckId: deckId, zone: zone, ref: ref),
+              _CardGrid(
+                cards: cards,
+                deckId: deckId,
+                zone: zone,
+                deckFormat: deckFormat,
+                ref: ref,
+              ),
           ],
         ),
       ),
@@ -412,12 +474,14 @@ class _CardGrid extends StatelessWidget {
   final List<YugiohCard> cards;
   final String deckId;
   final DeckZone zone;
+  final DeckFormat deckFormat;
   final WidgetRef ref;
 
   const _CardGrid({
     required this.cards,
     required this.deckId,
     required this.zone,
+    required this.deckFormat,
     required this.ref,
   });
 
@@ -487,11 +551,30 @@ class _CardGrid extends StatelessWidget {
                     ),
                   ),
                 ),
+
+              // Banlist badge (BAN / LIM / S-L)
+              if (_getBanlistStatus(card) != null)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: _BanlistBadge(status: _getBanlistStatus(card)!),
+                ),
             ],
           ),
         );
       },
     );
+  }
+
+  BanlistStatus? _getBanlistStatus(YugiohCard card) {
+    final banlist = card.misc?.banlist;
+    if (banlist == null) return null;
+    switch (deckFormat) {
+      case DeckFormat.masterDuel:
+        return banlist.tcg;
+      case DeckFormat.duelLinks:
+        return banlist.ocg;
+    }
   }
 
   void _showRemoveDialog(BuildContext context, YugiohCard card, int count) {
@@ -605,6 +688,85 @@ class _StatPill extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+}
+
+// ── Banlist badge ──────────────────────────────────────────────────────────────
+
+class _BanlistBadge extends StatelessWidget {
+  final BanlistStatus status;
+  const _BanlistBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, color) = switch (status) {
+      BanlistStatus.forbidden => ('BAN', AppTheme.getBanlistColor('Forbidden')),
+      BanlistStatus.limited => ('LIM', AppTheme.getBanlistColor('Limited')),
+      BanlistStatus.semiLimited => (
+        'S-L',
+        AppTheme.getBanlistColor('Semi-Limited'),
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 7,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Error text — tên card màu trắng, message màu đỏ nhạt ─────────────────────
+
+class _ErrorText extends StatelessWidget {
+  final String message;
+  const _ErrorText({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    // Format có separator \x00: "\x00CardName\x00warning message"
+    if (message.startsWith('\x00')) {
+      final parts = message.substring(1).split('\x00');
+      final cardName = parts.isNotEmpty ? parts[0] : '';
+      final warning = parts.length > 1 ? parts[1] : '';
+      return RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: cardName,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const TextSpan(text: '  '),
+            TextSpan(
+              text: warning,
+              style: TextStyle(
+                color: const Color(0xFFE74C3C).withValues(alpha: 0.85),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    // Format thường (deck size errors, copy limit...)
+    return Text(
+      message,
+      style: const TextStyle(color: Color(0xFFE74C3C), fontSize: 12),
     );
   }
 }

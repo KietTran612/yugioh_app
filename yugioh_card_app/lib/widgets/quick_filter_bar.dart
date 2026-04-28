@@ -788,89 +788,11 @@ class _Divider extends StatelessWidget {
 
 // ── Color helpers ──────────────────────────────────────────────────────────────
 
-Color _frameTypeColor(String frameType) {
-  switch (frameType.toLowerCase()) {
-    case 'normal':
-      return const Color(0xFFB8860B);
-    case 'effect':
-      return const Color(0xFFD2691E);
-    case 'ritual':
-      return const Color(0xFF4169E1);
-    case 'fusion':
-      return const Color(0xFF8B008B);
-    case 'synchro':
-      return const Color(0xFF708090);
-    case 'xyz':
-      return const Color(0xFF2F4F4F);
-    case 'link':
-      return const Color(0xFF1E90FF);
-    case 'spell':
-      return const Color(0xFF2E8B57);
-    case 'trap':
-      return const Color(0xFFC71585);
-    case 'token':
-      return const Color(0xFF808080);
-    default:
-      if (frameType.contains('pendulum')) return const Color(0xFF20B2AA);
-      return const Color(0xFF696969);
-  }
-}
+Color _frameTypeColor(String frameType) => AppTheme.getFrameColor(frameType);
 
-Color _attributeColor(String attribute) {
-  switch (attribute.toUpperCase()) {
-    case 'DARK':
-      return const Color(0xFF6A0DAD);
-    case 'LIGHT':
-      return const Color(0xFFDAA520);
-    case 'FIRE':
-      return const Color(0xFFCC2200);
-    case 'WATER':
-      return const Color(0xFF1565C0);
-    case 'EARTH':
-      return const Color(0xFF5D4037);
-    case 'WIND':
-      return const Color(0xFF2E7D32);
-    case 'DIVINE':
-      return const Color(0xFFE65100);
-    default:
-      return const Color(0xFF546E7A);
-  }
-}
+Color _attributeColor(String attribute) =>
+    AppTheme.getAttributeColor(attribute);
 
-Color _tcgRarityColor(String code) {
-  switch (code) {
-    case '(C)':
-      return const Color(0xFF9E9E9E); // grey — Common
-    case '(R)':
-      return const Color(0xFF74B9FF); // blue — Rare
-    case '(SR)':
-      return const Color(0xFF00C896); // teal — Super Rare
-    case '(UR)':
-      return const Color(0xFFFFB800); // gold — Ultra Rare
-    case '(ScR)':
-      return const Color(0xFFFF6B6B); // red — Secret Rare
-    case '(StR)':
-      return const Color(0xFFE040FB); // purple — Starlight Rare
-    case '(GR)':
-      return const Color(0xFFFFD700); // gold — Ghost Rare
-    case '(CR)':
-      return const Color(0xFF00E5FF); // cyan — Collector's Rare
-    case '(QCR)':
-      return const Color(0xFFFF9800); // orange — Quarter Century Rare
-    default:
-      return const Color(0xFF546E7A);
-  }
-}
+Color _tcgRarityColor(String code) => AppTheme.getTcgRarityColor(code);
 
-Color _banlistColor(String status) {
-  switch (status) {
-    case 'Forbidden':
-      return const Color(0xFFE74C3C);
-    case 'Limited':
-      return const Color(0xFFFFB800);
-    case 'Semi-Limited':
-      return const Color(0xFF3498DB);
-    default:
-      return const Color(0xFF546E7A);
-  }
-}
+Color _banlistColor(String status) => AppTheme.getBanlistColor(status);

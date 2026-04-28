@@ -45,6 +45,32 @@ class AppTheme {
     'token': Color(0xFF808080),
   };
 
+  // ── Banlist colours ────────────────────────────────────────────────────────
+  static const Map<String, Color> banlistColors = {
+    'Forbidden': Color(0xFFE74C3C), // red
+    'Limited': Color(0xFFE67E22), // orange
+    'Semi-Limited': Color(0xFFF1C40F), // yellow
+  };
+
+  static Color getBanlistColor(String status) =>
+      banlistColors[status] ?? textMuted;
+
+  // ── TCG Rarity colours ─────────────────────────────────────────────────────
+  static const Map<String, Color> tcgRarityColors = {
+    '(C)': Color(0xFF9E9E9E), // grey   — Common
+    '(R)': Color(0xFF74B9FF), // blue   — Rare
+    '(SR)': Color(0xFF00C896), // teal   — Super Rare
+    '(UR)': Color(0xFFFFB800), // gold   — Ultra Rare
+    '(ScR)': Color(0xFFFF6B6B), // red    — Secret Rare
+    '(StR)': Color(0xFFE040FB), // purple — Starlight Rare
+    '(GR)': Color(0xFFFFD700), // gold   — Ghost Rare
+    '(CR)': Color(0xFF00E5FF), // cyan   — Collector's Rare
+    '(QCR)': Color(0xFFFF9800), // orange — Quarter Century Rare
+  };
+
+  static Color getTcgRarityColor(String code) =>
+      tcgRarityColors[code] ?? textMuted;
+
   static Color getAttributeColor(String? attribute) {
     if (attribute == null) return textMuted;
     return attributeColors[attribute.toUpperCase()] ?? textMuted;
