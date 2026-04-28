@@ -94,7 +94,7 @@ App khởi động → load SharedPreferences cache (nếu có) → fetch API n�
   - Auto-collapse khi vượt device height
   - Badge số khi có filter active
 - **Filter Panel** — bottom sheet popup, đồng bộ với Quick Filter Bar
-- Filter multi-select: Type/Attribute/Race/Level (OR), Banlist (OR), Format (AND), Archetype (single)
+- Filter multi-select: Type/Attribute/Race/Level (OR), Banlist (OR), Format (AND), Archetype (single), **TCG Rarity** (OR)
 
 ### Card Detail
 - Ảnh → tap full screen, pinch-to-zoom, Hero animation
@@ -102,6 +102,7 @@ App khởi động → load SharedPreferences cache (nếu có) → fetch API n�
 - Card text — `SelectableText` (bôi đen copy được)
 - **Dịch** — 11 ngôn ngữ qua Google Translate, cache local, lock chống dịch chồng
 - Formats, Card Sets (tap → Set Detail), Prices
+- **TCG Rarity** — chips màu theo tier (Common/Rare/Super/Ultra/Secret...) với tên đầy đủ + code
 
 ### Sets
 - ~700+ sets, derive từ card data (không cần API riêng)
@@ -165,6 +166,14 @@ flutter build apk --release
 
 ## Changelog
 
+### v0.9 (April 2026)
+- **TCG Rarity filter** — filter theo `set_rarity_code` từ API (`(C)`, `(R)`, `(SR)`, `(UR)`, `(ScR)`...)
+  - `FilterIndex.tcgRarities` — collect từ tất cả sets, sort theo tier, serialize vào cache
+  - `FilterState.tcgRarities` — OR logic, card match nếu có ít nhất 1 set với rarity được chọn
+  - QuickFilterBar section "TCG Rarity" với chip màu theo tier
+  - Card Detail section "TCG Rarity" — chips hiển thị tên đầy đủ + code, sort theo tier
+  - Bump cache key `v5` → `v6` để rebuild index
+
 ### v0.8 (April 2026)
 - **Deck Builder** — tab Collection hoàn thiện
   - `deck_model.dart` — `Deck`, `DeckFormat`, `DeckFormatConfig` (MD/DL rules)
@@ -216,4 +225,4 @@ Images: `https://images.ygoprodeck.com/images/cards/{id}.jpg`
 
 ---
 
-*Last updated: April 2026 — v0.8*
+*Last updated: April 2026 — v0.9*

@@ -82,6 +82,16 @@ class FilterStateNotifier extends StateNotifier<FilterState> {
     state = state.copyWith(formats: updated);
   }
 
+  void toggleTcgRarity(String value) {
+    final updated = Set<String>.from(state.tcgRarities);
+    if (updated.contains(value)) {
+      updated.remove(value);
+    } else {
+      updated.add(value);
+    }
+    state = state.copyWith(tcgRarities: updated);
+  }
+
   // Single-select
   void setArchetype(String? value) => state = state.copyWith(archetype: value);
   void setAtkRange(int? min, int? max) =>
@@ -155,6 +165,13 @@ List<YugiohCard> _applyFilter(List<YugiohCard> allCards, FilterState filter) {
     cards = cards.where((c) {
       final cardFormats = c.misc?.formats ?? [];
       return filter.formats.every((f) => cardFormats.contains(f));
+    }).toList();
+  }
+
+  // TCG Rarity filter — card must have at least one set with a matching rarity code (OR logic)
+  if (filter.tcgRarities.isNotEmpty) {
+    cards = cards.where((c) {
+      return c.sets.any((s) => filter.tcgRarities.contains(s.setRarityCode));
     }).toList();
   }
 

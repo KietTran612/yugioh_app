@@ -234,6 +234,7 @@ class FilterIndex {
   final List<String> attributes;
   final List<String> archetypes;
   final List<int> levels;
+  final List<String> tcgRarities; // sorted by rarity tier
 
   const FilterIndex({
     required this.types,
@@ -242,6 +243,7 @@ class FilterIndex {
     required this.attributes,
     required this.archetypes,
     required this.levels,
+    this.tcgRarities = const [],
   });
 
   factory FilterIndex.fromJson(Map<String, dynamic> json) => FilterIndex(
@@ -262,6 +264,9 @@ class FilterIndex {
         .toList(),
     levels: (json['levels'] as List<dynamic>? ?? [])
         .map((e) => e as int)
+        .toList(),
+    tcgRarities: (json['tcg_rarities'] as List<dynamic>? ?? [])
+        .map((e) => e as String)
         .toList(),
   );
 }

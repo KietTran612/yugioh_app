@@ -8,7 +8,7 @@ import '../models/card_model.dart';
 const _apiBase = 'https://db.ygoprodeck.com/api/v7';
 const _imageBase = 'https://images.ygoprodeck.com/images/cards';
 const _imageSmallBase = 'https://images.ygoprodeck.com/images/cards_small';
-const _cacheKey = 'yugioh_cards_cache_v5';
+const _cacheKey = 'yugioh_cards_cache_v6';
 
 class CardDataService {
   static final _dio = Dio(
@@ -134,6 +134,7 @@ class CardDataService {
           'attributes': result.filterIndex.attributes,
           'archetypes': result.filterIndex.archetypes,
           'levels': result.filterIndex.levels,
+          'tcg_rarities': result.filterIndex.tcgRarities,
         },
       };
       final jsonStr = jsonEncode(json);
@@ -325,6 +326,7 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
   final attributes = <String>{};
   final archetypes = <String>{};
   final levels = <int>{};
+  final tcgRarityCodes = <String>{};
 
   for (final c in cards) {
     if (c.type.isNotEmpty) types.add(c.type);
@@ -333,7 +335,32 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
     if (c.attribute?.isNotEmpty == true) attributes.add(c.attribute!);
     if (c.archetype.isNotEmpty) archetypes.add(c.archetype);
     if (c.level != null) levels.add(c.level!);
+    for (final s in c.sets) {
+      if (s.setRarityCode.isNotEmpty) tcgRarityCodes.add(s.setRarityCode);
+    }
   }
+
+  // Sort rarity codes by tier: Common → Rare → Super → Ultra → Secret → others
+  const _rarityOrder = [
+    '(C)',
+    '(R)',
+    '(SR)',
+    '(UR)',
+    '(ScR)',
+    '(StR)',
+    '(GR)',
+    '(CR)',
+    '(QCR)',
+  ];
+  final sortedRarities = tcgRarityCodes.toList()
+    ..sort((a, b) {
+      final ai = _rarityOrder.indexOf(a);
+      final bi = _rarityOrder.indexOf(b);
+      if (ai == -1 && bi == -1) return a.compareTo(b);
+      if (ai == -1) return 1;
+      if (bi == -1) return -1;
+      return ai.compareTo(bi);
+    });
 
   return CardDataResult(
     cards: cards,
@@ -344,12 +371,16 @@ CardDataResult _parseApiCards(List<dynamic> rawCards) {
       attributes: attributes.toList()..sort(),
       archetypes: archetypes.toList()..sort(),
       levels: levels.toList()..sort(),
+      tcgRarities: sortedRarities,
     ),
   )..let((result) {
     debugPrint('[CardData] FilterIndex built:');
     debugPrint('  - frameTypes: ${result.filterIndex.frameTypes.length} items');
     debugPrint('  - attributes: ${result.filterIndex.attributes.length} items');
     debugPrint('  - races: ${result.filterIndex.races.length} items');
+    debugPrint(
+      '  - tcgRarities: ${result.filterIndex.tcgRarities.length} items',
+    );
     if (result.filterIndex.frameTypes.isNotEmpty) {
       debugPrint(
         '  - frameTypes sample: ${result.filterIndex.frameTypes.take(5).join(", ")}',

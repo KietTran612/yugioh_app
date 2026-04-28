@@ -36,6 +36,7 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     'Archetype',
     'ATK',
     'DEF',
+    'TCG Rarity',
     'Banlist',
     'Format',
     'Sort',
@@ -48,6 +49,7 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
     'Archetype': 100.0,
     'ATK': 90.0,
     'DEF': 90.0,
+    'TCG Rarity': 100.0,
     'Banlist': 90.0,
     'Format': 90.0,
     'Sort': 120.0,
@@ -327,6 +329,19 @@ class _QuickFilterBarState extends ConsumerState<QuickFilterBar>
                       minValue: filter.defMin,
                       maxValue: filter.defMax,
                       onChanged: notifier.setDefRange,
+                    ),
+                  ),
+                  _Divider(),
+                  _CollapsibleSection(
+                    title: 'TCG Rarity',
+                    isOpen: _openSections.contains('TCG Rarity'),
+                    activeCount: filter.tcgRarities.length,
+                    onToggle: () => _toggleSection('TCG Rarity', hasActive),
+                    child: _MultiChipGroup<String>(
+                      items: index.tcgRarities,
+                      selected: filter.tcgRarities,
+                      onTap: notifier.toggleTcgRarity,
+                      colorBuilder: _tcgRarityColor,
                     ),
                   ),
                   _Divider(),
@@ -743,6 +758,9 @@ class _ActiveFilterSummary extends StatelessWidget {
     if (filter.banlistStatuses.isNotEmpty) {
       parts.add(filter.banlistStatuses.join(', '));
     }
+    if (filter.tcgRarities.isNotEmpty) {
+      parts.add(filter.tcgRarities.join(', '));
+    }
     if (filter.formats.isNotEmpty) {
       parts.add(filter.formats.join(', '));
     }
@@ -814,6 +832,31 @@ Color _attributeColor(String attribute) {
       return const Color(0xFF2E7D32);
     case 'DIVINE':
       return const Color(0xFFE65100);
+    default:
+      return const Color(0xFF546E7A);
+  }
+}
+
+Color _tcgRarityColor(String code) {
+  switch (code) {
+    case '(C)':
+      return const Color(0xFF9E9E9E); // grey — Common
+    case '(R)':
+      return const Color(0xFF74B9FF); // blue — Rare
+    case '(SR)':
+      return const Color(0xFF00C896); // teal — Super Rare
+    case '(UR)':
+      return const Color(0xFFFFB800); // gold — Ultra Rare
+    case '(ScR)':
+      return const Color(0xFFFF6B6B); // red — Secret Rare
+    case '(StR)':
+      return const Color(0xFFE040FB); // purple — Starlight Rare
+    case '(GR)':
+      return const Color(0xFFFFD700); // gold — Ghost Rare
+    case '(CR)':
+      return const Color(0xFF00E5FF); // cyan — Collector's Rare
+    case '(QCR)':
+      return const Color(0xFFFF9800); // orange — Quarter Century Rare
     default:
       return const Color(0xFF546E7A);
   }

@@ -9,6 +9,7 @@ class FilterState {
   final Set<int> levels; // e.g. {4, 8}
   final Set<String> banlistStatuses; // e.g. {'Forbidden', 'Limited'}
   final Set<String> formats; // e.g. {'TCG', 'OCG', 'Master Duel'}
+  final Set<String> tcgRarities; // e.g. {'(C)', '(R)', '(SR)', '(UR)'}
 
   // Single-select filters
   final String? archetype;
@@ -27,6 +28,7 @@ class FilterState {
     this.levels = const {},
     this.banlistStatuses = const {},
     this.formats = const {},
+    this.tcgRarities = const {},
     this.archetype,
     this.atkMin,
     this.atkMax,
@@ -44,6 +46,7 @@ class FilterState {
       levels.isNotEmpty ||
       banlistStatuses.isNotEmpty ||
       formats.isNotEmpty ||
+      tcgRarities.isNotEmpty ||
       archetype != null ||
       atkMin != null ||
       atkMax != null ||
@@ -58,6 +61,7 @@ class FilterState {
     Set<int>? levels,
     Set<String>? banlistStatuses,
     Set<String>? formats,
+    Set<String>? tcgRarities,
     Object? archetype = _sentinel,
     Object? atkMin = _sentinel,
     Object? atkMax = _sentinel,
@@ -74,6 +78,7 @@ class FilterState {
       levels: levels ?? this.levels,
       banlistStatuses: banlistStatuses ?? this.banlistStatuses,
       formats: formats ?? this.formats,
+      tcgRarities: tcgRarities ?? this.tcgRarities,
       archetype: archetype == _sentinel ? this.archetype : archetype as String?,
       atkMin: atkMin == _sentinel ? this.atkMin : atkMin as int?,
       atkMax: atkMax == _sentinel ? this.atkMax : atkMax as int?,

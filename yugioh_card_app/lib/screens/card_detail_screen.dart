@@ -220,6 +220,12 @@ class CardDetailScreen extends StatelessWidget {
                     const SizedBox(height: 20),
                   ],
 
+                  // ── TCG Rarity ────────────────────────────────────────
+                  if (card.sets.isNotEmpty) ...[
+                    _TcgRaritySection(sets: card.sets),
+                    const SizedBox(height: 20),
+                  ],
+
                   // ── Card Text ─────────────────────────────────────────
                   _CardTextSection(card: card),
 
@@ -1094,6 +1100,128 @@ class _PricesPanel extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── TCG Rarity section ────────────────────────────────────────────────────────
+
+class _TcgRaritySection extends StatelessWidget {
+  final List<CardSet> sets;
+  const _TcgRaritySection({required this.sets});
+
+  // Rarity tier order for sorting
+  static const _order = [
+    '(C)',
+    '(R)',
+    '(SR)',
+    '(UR)',
+    '(ScR)',
+    '(StR)',
+    '(GR)',
+    '(CR)',
+    '(QCR)',
+  ];
+
+  static Color _rarityColor(String code) {
+    switch (code) {
+      case '(C)':
+        return const Color(0xFF9E9E9E);
+      case '(R)':
+        return const Color(0xFF74B9FF);
+      case '(SR)':
+        return const Color(0xFF00C896);
+      case '(UR)':
+        return const Color(0xFFFFB800);
+      case '(ScR)':
+        return const Color(0xFFFF6B6B);
+      case '(StR)':
+        return const Color(0xFFE040FB);
+      case '(GR)':
+        return const Color(0xFFFFD700);
+      case '(CR)':
+        return const Color(0xFF00E5FF);
+      case '(QCR)':
+        return const Color(0xFFFF9800);
+      default:
+        return const Color(0xFF546E7A);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Collect unique rarity codes + their full names
+    final rarityMap = <String, String>{}; // code → name
+    for (final s in sets) {
+      if (s.setRarityCode.isNotEmpty) {
+        rarityMap[s.setRarityCode] = s.setRarity;
+      }
+    }
+    if (rarityMap.isEmpty) return const SizedBox.shrink();
+
+    // Sort by tier
+    final sorted = rarityMap.entries.toList()
+      ..sort((a, b) {
+        final ai = _order.indexOf(a.key);
+        final bi = _order.indexOf(b.key);
+        if (ai == -1 && bi == -1) return a.key.compareTo(b.key);
+        if (ai == -1) return 1;
+        if (bi == -1) return -1;
+        return ai.compareTo(bi);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionHeader(title: 'TCG Rarity'),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: sorted.map((entry) {
+            final color = _rarityColor(entry.key);
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: color.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    entry.value, // full name e.g. "Ultra Rare"
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    entry.key, // code e.g. "(UR)"
+                    style: TextStyle(
+                      color: color.withValues(alpha: 0.7),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

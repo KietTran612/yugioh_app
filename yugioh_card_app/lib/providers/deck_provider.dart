@@ -188,7 +188,7 @@ final deckCardsProvider = FutureProvider.family<DeckCards, String>((
       );
     },
     loading: () => const DeckCards(main: [], extra: [], side: []),
-    error: (_, __) => const DeckCards(main: [], extra: [], side: []),
+    error: (_, _) => const DeckCards(main: [], extra: [], side: []),
   );
 });
 
