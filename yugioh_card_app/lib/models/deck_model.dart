@@ -244,4 +244,33 @@ class Deck {
     final list = jsonDecode(raw) as List;
     return list.map((e) => Deck.fromJson(e as Map<String, dynamic>)).toList();
   }
+
+  /// Export deck to YDK format — compatible with EDOPro, YGOPRODeck,
+  /// and importable into Master Duel via the official card database.
+  ///
+  /// Format:
+  ///   #created by <app>
+  ///   #main
+  ///   <card_id per line, duplicates repeated>
+  ///   #extra
+  ///   <extra deck card IDs>
+  ///   !side
+  ///   <side deck card IDs>
+  String toYdk() {
+    final buf = StringBuffer();
+    buf.writeln('#created by YuGiOh Card App');
+    buf.writeln('#main');
+    for (final id in mainDeck) {
+      buf.writeln(id);
+    }
+    buf.writeln('#extra');
+    for (final id in extraDeck) {
+      buf.writeln(id);
+    }
+    buf.writeln('!side');
+    for (final id in sideDeck) {
+      buf.writeln(id);
+    }
+    return buf.toString().trimRight();
+  }
 }
